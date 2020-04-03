@@ -571,7 +571,7 @@ if(TRUE){
   old <- par(mfrow = c(1, 2))
   plot(Day, Infected, type ="b")
   plot(Day, Infected, log = "y")
-  abline(lm(log10(Infected) ~ Day))
+  abline(lm(log10(Infected) ~ Day),col="red")
   title(sprintf("Total infections COVID-19 %s",country), outer = TRUE, line = -2)
   
   SIR <- function(time, state, parameters) {
@@ -671,12 +671,12 @@ if(TRUE){
   
   
   
-  ### without pi(t), the standard state-space SIR model without intervention
-  res.nopi <- tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=150,
-                       casename=sprintf("%s_nopi",country),save_files = F,save_plot_data = F,
-                       M=5e3,nburnin = 2e3)
-  print(res.nopi$plot_infection)
-  print(res.nopi$plot_removed)
+  # ### without pi(t), the standard state-space SIR model without intervention
+  # res.nopi <- tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=150,
+  #                      casename=sprintf("%s_nopi",country),save_files = F,save_plot_data = F,
+  #                      M=5e3,nburnin = 2e3)
+  # print(res.nopi$plot_infection)
+  # print(res.nopi$plot_removed)
   
   ### a SIR model with a time-varying transmission rate - Step function of pi(t)
   change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020")
@@ -689,16 +689,16 @@ if(TRUE){
   print(res.step$plot_removed)
   
   
-  ### SIR with time-varying quarantine, which follows a Dirac Delta function rho(t)
-  change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020")
-  phi0<- c(0.05,0.25,0.4,0.2)
-  res.q <- qh.eSIR (Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=150,
-                    phi0=phi0,change_time=change_time,casename=sprintf("%s_q",country),
-                    save_files = F,save_mcmc = F,save_plot_data = F,
-                    M=5e3,nburnin = 2e3)
-  
-  print(res.q$plot_infection)
-  print(res.q$plot_removed)
+  # ### SIR with time-varying quarantine, which follows a Dirac Delta function rho(t)
+  # change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020")
+  # phi0<- c(0.05,0.25,0.4,0.2)
+  # res.q <- qh.eSIR (Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=150,
+  #                   phi0=phi0,change_time=change_time,casename=sprintf("%s_q",country),
+  #                   save_files = F,save_mcmc = F,save_plot_data = F,
+  #                   M=5e3,nburnin = 2e3)
+  # 
+  # print(res.q$plot_infection)
+  # print(res.q$plot_removed)
   
   
   ### 
