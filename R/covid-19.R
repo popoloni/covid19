@@ -310,6 +310,7 @@ for (useBIG in c(FALSE,TRUE)) {
     ny=3
     BIGlabel=""
     excludelist = c("China","South Korea","Japan") 
+    cases_minimum = 50
     
   } else {
     ntop=24
@@ -317,6 +318,7 @@ for (useBIG in c(FALSE,TRUE)) {
     ny=3
     BIGlabel="BIG "
     excludelist = c()
+    cases_minimum = 100
     
   }
   
@@ -406,7 +408,7 @@ for (useBIG in c(FALSE,TRUE)) {
     
     datx <- datx[order(datx$date, datx$country, decreasing = TRUE), ]
     datx<-setDT(datx, keep.rownames=TRUE, key=NULL, check.names=FALSE)
-    cases_minimum = 25
+
     
     datx <- datx[, days_since_case_onset := (as.integer(date) - as.integer(min(date[confirmed > cases_minimum]))), by = list(country)]
     datx <- datx[, newly_confirmed       := as.integer(confirmed - shift(confirmed, n = 1, type = "lead")),        by = list(country)]
@@ -447,10 +449,11 @@ for (useBIG in c(FALSE,TRUE)) {
     print(xyp)
     
     # log(10) of newly confirmed cases vs days
-    xyp <- xyplot(log10(newly_confirmed) ~ date | paste(mytitle,"Newly confirmed cases of COVID-19",sep=" - "), groups = country,
+    xyp <- xyplot(newly_confirmed ~ date | paste(mytitle,"Newly confirmed cases of COVID-19",sep=" - "), groups = country,
                   data = subset(datx, date > as.Date("2020-03-01")), 
-                  xlab = "Date", ylab = "log10 of number of new COVID-19 cases",
-                  scales = list(x = list(rot = 45, format = "%Y-%m-%d", at = seq(as.Date("2020-03-01"), Sys.Date(), by = "2 days"))), 
+                  xlab = "Date", ylab = "number of new COVID-19 cases", 
+                  yscale.components = yscale.components.log10ticks,
+                  scales = list(y = list(log = 10),x = list(rot = 45, format = "%Y-%m-%d", at = seq(as.Date("2020-03-01"), Sys.Date(), by = "2 days"))), 
                   key = mykey, 
                   type = c("p", "smooth"), #type = "o", 
                   pch=1:length(country_subset),col=col,lwd = 2,grid = TRUE) 
@@ -469,52 +472,63 @@ for (useBIG in c(FALSE,TRUE)) {
     xyp <- xyplot(value ~ date | factor(cases,levels=c("recovered","death","confirmed","active")), groups = country,
                   data = subset(test, date > as.Date("2020-03-01")), 
                   xlab = "Date", ylab = "number of cases",
-                  scales = list(x = list(rot = 45, format = "%Y-%m-%d", at = seq(as.Date("2020-03-01"), Sys.Date(), by = "2 days"))), 
+                  yscale.components = yscale.components.log10ticks,
+                  scales = list(y = list(log = 10),x = list(rot = 45, format = "%Y-%m-%d", at = seq(as.Date("2020-03-01"), Sys.Date(), by = "2 days"))), 
                   key = mykey, 
                   type = "o", pch=1:length(country_subset),col=col,lwd = 2,grid = TRUE) 
     print(xyp)
     
     
     # log(10) of confirmed cases vs days since reach 100 cases
-    xyp<-xyplot(log10(confirmed) ~ days_since_case_onset |  paste0(mytitle," - ","Log(confirmed cases) of COVID-19 since onset of sick person nr ",cases_minimum), 
+    xyp<-xyplot(confirmed ~ days_since_case_onset |  paste0(mytitle," - ","confirmed cases of COVID-19 since onset of sick person nr ",cases_minimum), 
                 groups = country,
                 data = subset(datx, days_since_case_onset >= 0 ), 
-                scales = list(x = list(at = seq(0,max(datx$days_since_case_onset), by =5))),
-                xlab = paste0("Days since COVID-19 onset - confirmed case ",cases_minimum), ylab = "Log10 of number of confirmed cases",
+                scales = list(y = list(log = 10),x = list(at = seq(0,max(datx$days_since_case_onset), by =5))),
+                xlab = paste0("Days since COVID-19 onset - confirmed case ",cases_minimum), ylab = "number of confirmed cases",
                 #key = mykey,
+                yscale.components = yscale.components.log10ticks,
                 type = "o", pch=1:length(country_subset),col=col,lwd = 2,
-                panel = mypanel,grid = TRUE) 
+                grid = TRUE,
+                panel = mypanel)
     print(direct.label(xyp,"smart.grid"))
     
     # log(10) of death cases vs days since reach 100 cases
-    xyp<-xyplot(log10(death) ~ days_since_case_ondeath |  paste0(mytitle," - ","Log(dead cases) of COVID-19 since dead of sick person nr ",cases_minimum), 
+    xyp<-xyplot(death ~ days_since_case_ondeath |  paste0(mytitle," - ","dead cases of COVID-19 since dead of sick person nr ",cases_minimum), 
                 groups = country,
                 data = subset(datx, days_since_case_ondeath >= 0 ), 
-                xlab = paste0("Days since nr deaths was ",cases_minimum), ylab = "Log10 of number of deaths",
+                xlab = paste0("Days since nr deaths was ",cases_minimum), ylab = "number of deaths",
+                scales = list(y = list(log = 10)),yscale.components = yscale.components.log10ticks,
                 #key = mykey,
                 type = "o", pch=1:length(country_subset),col=col,lwd = 2,
-                panel = mypanel,grid = TRUE) 
+                grid = TRUE,
+                panel = mypanel) 
     print(direct.label(xyp,"smart.grid"))
     
     # log(10) of recovered cases vs days since reach 100 cases
-    xyp<-xyplot(log10(recovered) ~ days_since_case_onsafe |  paste0(mytitle," - ","Log(recovered cases) of COVID-19 since recovered of sick person nr ",cases_minimum), 
+    xyp<-xyplot(recovered ~ days_since_case_onsafe |  paste0(mytitle," - ","recovered cases of COVID-19 since recovered of sick person nr ",cases_minimum), 
                 groups = country,
                 data = subset(datx, days_since_case_onsafe >= 0 ), 
-                xlab = paste0("Days since nr recovered case was ",cases_minimum), ylab = "Log10 of number of recovered",
+                xlab = paste0("Days since nr recovered case was ",cases_minimum), ylab = "number of recovered",
+                scales = list(y = list(log = 10)),yscale.components = yscale.components.log10ticks,
                 #key = mykey,
                 type = "o", pch=1:length(country_subset),col=col,lwd = 2,
-                panel = mypanel,grid = TRUE) 
+                grid = TRUE,
+                panel = mypanel) 
     print(direct.label(xyp,"smart.grid"))
     
     # log(10) of active cases vs days since reach 100 cases
-    xyp<-xyplot(log10(active) ~ days_since_case_on |  paste0(mytitle," - ","Log(active cases) of COVID-19 since nr active was ",cases_minimum), 
+    xyp<-xyplot(active ~ days_since_case_on |  paste0(mytitle," - ","active cases of COVID-19 since nr active was ",cases_minimum), 
                 groups = country,
                 data = subset(datx, days_since_case_on >= 0 ), 
-                xlab = paste0("Days since nr active case was ",cases_minimum), ylab = "Log10 of number of active cases",
+                xlab = paste0("Days since nr active case was ",cases_minimum), ylab = "number of active cases",
+                scales = list(y = list(log = 10)),yscale.components = yscale.components.log10ticks,
                 key = mykey,
                 type = "o", pch=1:length(country_subset),col=col,lwd = 2,
-                panel = mypanel,grid = TRUE)
+                grid = TRUE,
+                panel = mypanel)
     print(direct.label(xyp,"smart.grid"))
+    
+    
   }
   
   dev.off() # lo chiudo
@@ -681,9 +695,9 @@ if(TRUE){
   ### a SIR model with a time-varying transmission rate - Step function of pi(t)
   change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020")
   pi0<- c(1.0,0.9,0.4,0.2,0.1)
-  res.step <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=150,
+  res.step <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
                       pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%s_step",country),
-                      save_files = F, save_mcmc=F,save_plot_data = F,
+                      save_files = F, save_mcmc=F,save_plot_data = F,add_death =T,
                       M=5e3,nburnin = 2e3)
   print(res.step$plot_infection)
   print(res.step$plot_removed)
@@ -699,6 +713,16 @@ if(TRUE){
   # 
   # print(res.q$plot_infection)
   # print(res.q$plot_removed)
+  
+  
+  change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020","04/14/2020","05/08/2020","06/03/2020")
+  pi0<- c(1.0,0.9,0.4,0.2,0.1,0.4,0.6,1.0)
+  res.step_reopen <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
+                      pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%sstep_reopen",country),
+                      save_files = F, save_mcmc=F,save_plot_data = F,add_death =T,
+                      M=5e3,nburnin = 2e3)
+  print(res.step_reopen$plot_infection)
+  print(res.step_reopen$plot_removed)
   
   
   ### 
