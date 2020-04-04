@@ -196,14 +196,41 @@ cov_curve_cases <- covid %>%
   mutate(days_elapsed = date - min(date),
          end_label = ifelse(date == max(date), cname, NA))
 
+
 # cov_curve
 
 focus_cn <- c("CAN", "GBR", "USA", "DEU", "ITA",
               "FRA", "ESP", "TUR", "CHE")
 
+cov_curve_deaths_filtered <- cov_curve_deaths %>% filter(iso3 %in% focus_cn)
 
-plot_deaths<-cov_curve_deaths %>%
-  filter(iso3 %in% focus_cn) %>% ## focus on just a few countries, defined above
+# min_x<- log10(10) #min(cov_curve_deaths_filtered$cu_deaths)
+# max_x<- as.numeric(max(cov_curve_deaths_filtered$days_elapsed))
+# max_y<- max(cov_curve_deaths_filtered$cu_deaths)
+# 
+# f1 <- function(x) {(x/1)+min_x}
+# f2 <- function(x) {(x/2)+min_x}
+# f3 <- function(x) {(x/3)+min_x}
+# f5 <- function(x) {(x/5)+min_x}
+# f7 <- function(x) {(x/7)+min_x}
+# f10 <- function(x) {(x/10)+min_x}
+# 
+# xlim1<-c(0,min(max_x,1*log2(max_y)))
+# xlim2<-c(0,min(max_x,2*log2(max_y)))
+# xlim3<-c(0,min(max_x,3*log2(max_y)))
+# xlim5<-c(0,min(max_x,5*log2(max_y)))
+# xlim7<-c(0,min(max_x,7*log2(max_y)))
+# xlim10<-c(0,min(max_x,10*log2(max_y)))
+
+g1 <- stat_function(fun=f1, linetype="dashed", aes(colour="double each day"), xlim=xlim1)
+g2 <- stat_function(fun=f2, linetype="dashed", aes(colour="double each 2 days"), xlim=xlim2)
+g3 <- stat_function(fun=f3, linetype="dashed", aes(colour="double each 3 days"), xlim=xlim3)
+g5 <- stat_function(fun=f5, linetype="dashed", aes(colour="double each 5 days"), xlim=xlim5)
+g7 <- stat_function(fun=f7, linetype="dashed", aes(colour="double each week"), xlim=xlim7)
+g10 <- stat_function(fun=f10, linetype="dashed", aes(colour="double each ten days"), xlim=xlim10)
+
+
+plot_deaths<-cov_curve_deaths_filtered %>% ## focus on just a few countries, defined above
   mutate(end_label = recode(end_label, `United States` = "USA",
                             `Iran, Islamic Republic of` = "Iran", 
                             `Korea, Republic of` = "South Korea", 
@@ -225,11 +252,36 @@ plot_deaths<-cov_curve_deaths %>%
        title = "Cumulative Deaths from COVID-19, Selected Countries", 
        subtitle = paste("Data as of", format(max(cov_curve_deaths$date), "%A, %B %e, %Y")), 
        caption = "Kieran Healy @kjhealy / Data: ECDC") + 
-  mytheme
+  mytheme #+g1+g2+g3+g5+g7+g10
 
+cov_curve_cases_filtered <- cov_curve_cases %>% filter(iso3 %in% focus_cn)
 
-plot_cases<-cov_curve_cases %>%
-  filter(iso3 %in% focus_cn) %>% ## focus on just a few countries, defined above
+# min_x<- log10(25) #min(cov_curve_cases_filtered$cu_cases)
+# max_x<- as.numeric(max(cov_curve_cases_filtered$days_elapsed))
+# max_y<- max(cov_curve_cases_filtered$cu_cases)
+# 
+# f1 <- function(x) {(x/1)+min_x}
+# f2 <- function(x) {(x/2)+min_x}
+# f3 <- function(x) {(x/3)+min_x}
+# f5 <- function(x) {(x/5)+min_x}
+# f7 <- function(x) {(x/7)+min_x}
+# f10 <- function(x) {(x/10)+min_x}
+# 
+# xlim1<-c(0,min(max_x,1*log2(max_y)))
+# xlim2<-c(0,min(max_x,2*log2(max_y)))
+# xlim3<-c(0,min(max_x,3*log2(max_y)))
+# xlim5<-c(0,min(max_x,5*log2(max_y)))
+# xlim7<-c(0,min(max_x,7*log2(max_y)))
+# xlim10<-c(0,min(max_x,10*log2(max_y)))
+
+g1 <- stat_function(fun=f1, linetype="dashed", aes(colour="double each day"), xlim=xlim1)
+g2 <- stat_function(fun=f2, linetype="dashed", aes(colour="double each 2 days"), xlim=xlim2)
+g3 <- stat_function(fun=f3, linetype="dashed", aes(colour="double each 3 days"), xlim=xlim3)
+g5 <- stat_function(fun=f5, linetype="dashed", aes(colour="double each 5 days"), xlim=xlim5)
+g7 <- stat_function(fun=f7, linetype="dashed", aes(colour="double each week"), xlim=xlim7)
+g10 <- stat_function(fun=f10, linetype="dashed", aes(colour="double each ten days"), xlim=xlim10)
+
+plot_cases<-cov_curve_cases_filtered %>% ## focus on just a few countries, defined above
   mutate(end_label = recode(end_label, `United States` = "USA",
                             `Iran, Islamic Republic of` = "Iran", 
                             `Korea, Republic of` = "South Korea", 
@@ -251,7 +303,8 @@ plot_cases<-cov_curve_cases %>%
        title = "Cumulative Cases from COVID-19, Selected Countries", 
        subtitle = paste("Data as of", format(max(cov_curve_cases$date), "%A, %B %e, %Y")), 
        caption = "Kieran Healy @kjhealy / Data: ECDC") + 
-  mytheme
+  mytheme #+g1+g2+g3+g5+g7+g10
+
 
 
 cov_case_curve <- covid %>%
