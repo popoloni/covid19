@@ -95,7 +95,10 @@ Our study suggests to continue to stay quarantined until end of May in order to 
 
 The graphs on this article have been calculated based on Italina Protezione Civile data until 4 April 2020. Graphs will be regularly updated when new data are available running the [code in the repository](R/covid-19.R).
 
+### A special thanks to 
+1. Song, P. X., Wang, L., Zhou, Y., He, J., Zhu, B., Wang, F., ... & Eisenberg, M. (2020). An epidemiological forecast model and software assessing interventions on COVID-19 epidemic in China. medRxiv.
 
+2. [Learning Machine blog](https://blog.ephorie.de/epidemiology-how-contagious-is-novel-coronavirus-2019-ncov)
 
 # R resources about COVID-19 spread
 * [covid-19.R](R/covid-19.R) - a collection of graphs, inspired by [Corona in Belgium](http://www.bnosac.be/index.php/blog/97-corona-in-belgium) with the addition of previsional model made by Facebook Prophet, [SIR plain model](https://blog.ephorie.de/covid-19-the-case-of-germany) and [SIR with variable transmission rate](https://github.com/lilywang1988/eSIR) implemented by eSIR library.
