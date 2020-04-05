@@ -1,9 +1,7 @@
 ﻿Covid-19 in Italy - scenarios based on extended state-space SIR epidemiological models
 ================
 
-2020-04-05
-
-[Italian version - Versione in Italiano](LEGGIMI.md)
+2020-04-05 by [Enrico Papalini](https://www.linkedin.com/in/enricopapalini/)
 
 Introduction
 -------
@@ -95,16 +93,16 @@ Final remarks: #STAYATHOME
 
 Our study suggests to continue to stay quarantined until end of May in order to avoid the COVID-19 spread. Italian people will be making genuine sacrifices staying lock down for about three months but this is the only solution our models suggest. We hope for the rapid discovery of a vaccine that can change this scenario but it is unrealistic to happen within three months.
 
-The graphs on this article have been calculated based on Italina Protezione Civile data until 4 April 2020. Graphs will be regularly updated when new data are available running the [code in the repository](covid-19.R).
+The graphs on this article have been calculated based on Italina Protezione Civile data until 4 April 2020. Graphs will be regularly updated when new data are available running the [code in the repository](R/covid-19.R).
 
 
 
-# R resources
-* covid-19.R - a collection of graphs, inspired by [Corona in Belgium](http://www.bnosac.be/index.php/blog/97-corona-in-belgium) with the addition of previsional model made by Facebook Prophet, [SIR plain model](https://blog.ephorie.de/covid-19-the-case-of-germany) and [SIR with variable transmission rate](https://github.com/lilywang1988/eSIR) implemented by eSIR library.
-* covid_ggplo2.R - a smaller collection of graphs, but nicer to display, made by [Kieran Healy](https://kieranhealy.org/blog/archives/2020/03/21/covid-19-tracking/)
-* epilocal.R - [Italian epilocal model](https://arxiv.org/pdf/2003.07928) made by Bonetti with the addition of end day predition, ispired by [EIEF COVID-19 Forum](https://www.dropbox.com/s/n7pyjvhilpc3ooj/Covid19_descriptive%20stats_30.pdf?raw=1) - this approach to calculate the end of the covid-19 spread has not  any scientifical accurancy.
+# R resources about COVID-19 spread
+* [covid-19.R](R/covid-19.R) - a collection of graphs, inspired by [Corona in Belgium](http://www.bnosac.be/index.php/blog/97-corona-in-belgium) with the addition of previsional model made by Facebook Prophet, [SIR plain model](https://blog.ephorie.de/covid-19-the-case-of-germany) and [SIR with variable transmission rate](https://github.com/lilywang1988/eSIR) implemented by eSIR library.
+* [covid_ggplo2.R](R/covid_ggplo2.R) - a smaller collection of graphs, but nicer to display, made by [Kieran Healy](https://kieranhealy.org/blog/archives/2020/03/21/covid-19-tracking/)
+* [epilocal.R](R/epilocal.R) - [Italian epilocal model](https://arxiv.org/pdf/2003.07928) made by Bonetti with the addition of end day predition, ispired by [EIEF COVID-19 Forum](https://www.dropbox.com/s/n7pyjvhilpc3ooj/Covid19_descriptive%20stats_30.pdf?raw=1) - this approach to calculate the end of the covid-19 spread has not  any scientifical accurancy.
 
-# Other resources in this reposiroty
+# Other resources in this repository
 
 
 * [covid_19_prediction_for_italy.ipynb](https://colab.research.google.com/drive/1K7FltVfGAnnMRmnp4F430gmgNkmaGgO9)
