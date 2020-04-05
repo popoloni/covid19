@@ -3,6 +3,8 @@
 
 2020-04-05 by [Enrico Papalini](https://www.linkedin.com/in/enricopapalini/)
 
+A [printable version](Article.pdf) of this article, updated to 4 April 2020.
+
 Introduction
 -------
 
@@ -25,7 +27,7 @@ By introducing a time-dependent
 ![Standard SIR](data/fig_model1.png)
 
 The function *π*(*t*) has been set stepwise trying to model the impacts of gradual lockdown strategy:
-- 21 February 2020: The first lockdowns began covering eleven municipalities and affecting around 50,000 people; schools in some Northen regions of Italy have been shut down too.
+- 21 February 2020: The first lockdowns began covering eleven municipalities and affecting around 50,000 people; schools in some Northern regions of Italy have been shut down too.
 - 8 March 2020: The quarantine zone has been expanded to cover much of northern Italy, affecting over sixteen million people, restricting travel from, to or within the affected areas, banning funerals and cultural events, and requiring people to keep at least one metre of distance from one another in public locations such as restaurants, churches and supermarkets.
 - 10 March 2020: The quarantine zone has been expanded to cover all the nation. The lockdown has started here.
 - 21 March 2020: A further enlargement of the lockdown has been announced, by shutting down all non-necessary businesses and industries.
@@ -66,7 +68,7 @@ If Italy were fully reopened after 13 April 2020, the number of infected people 
 Re-opening Italy after First of May
 -------
 
-If Italy were fully reopened after Firstof May 2020, the number of infected people should be lower but not enough to avoid the COVID-19 spread to restart, having a relative small peak at 6 June 2020 and infecting about 2% of Italians.
+If Italy were fully reopened after First of May 2020, the number of infected people should be lower but not enough to avoid the COVID-19 spread to restart, having a relatively small peak at 6 June 2020 and infecting about 2% of Italians.
 
 ![Italy_lockdown after_1may_reopen Infected](data/Italystep_after_1_may_reopen_forecast.png)
 
@@ -79,10 +81,10 @@ Second of June is Italian national day and we take this as possible date for a f
 ![Italy_lockdown after_2june_reopen Infected](data/Italyafter_2_june_reopen_forecast.png)
 
 
-How many lives has been saved with the lock down
+How many lives have been saved since the lockdown
 -------
 
-In order to try to estimate the positive effect of the current lockdown strategy, we compared the recovered + deaths graphs in the first (no lockdown) and the second (actual lock down) scenarios. The thiny black line shows the number of deaths in this two simulations. A scenario with no lockdown could cause the dead of about 18% of Italian population, instead the current lock down could reduce this figure to 0,25%. We strongly hope this model is wrong because 0,25% means about 150.000 deaths!
+In order to try to estimate the positive effect of the current lockdown strategy, we compared the recovered + deaths graphs in the first (no lockdown) and the second (actual lock down) scenarios. The thiny black line shows the number of deaths in these two simulations. A scenario with no lockdown could cause the dead of about 18% of Italian population, instead the current lock down could reduce this figure to 0,25%. We strongly hope this model is wrong because 0,25% means about 150.000 deaths!
 
 ![Italy_herd_immunity Recovered and deaths](data/Italy_herd_immunity_forecast2.png)
 
@@ -93,7 +95,7 @@ Final remarks: #STAYATHOME
 
 Our study suggests to continue to stay quarantined until end of May in order to avoid the COVID-19 spread. Italian people will be making genuine sacrifices staying lock down for about three months but this is the only solution our models suggest. We hope for the rapid discovery of a vaccine that can change this scenario but it is unrealistic to happen within three months.
 
-The graphs on this article have been calculated based on Italina Protezione Civile data until 4 April 2020. Graphs will be regularly updated when new data are available running the [code in the repository](R/covid-19.R).
+The graphs on this article have been calculated based on Italian Protezione Civile data until 4 April 2020. Graphs will be regularly updated when new data are available running the [code in the repository](R/covid-19.R).
 
 ### A special thanks to 
 1. Song, P. X., Wang, L., Zhou, Y., He, J., Zhu, B., Wang, F., ... & Eisenberg, M. (2020). An epidemiological forecast model and software assessing interventions on COVID-19 epidemic in China. medRxiv.
