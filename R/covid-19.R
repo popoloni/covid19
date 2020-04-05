@@ -1,6 +1,7 @@
 library(RCurl)
 library(rlist)
 library(lattice)
+library(latticeExtra)
 library(directlabels)
 library(RColorBrewer)
 library(readr)
@@ -537,45 +538,55 @@ for (useBIG in c(FALSE,TRUE)) {
 
 
 
-### START ITALY PROJECTIONS
+### START ITALY PROJECTIONS ###
 
 library(prophet)
 library(ggplot2)
 
+library(deSolve)
+
+### https://github.com/lilywang1988/eSIR
+#library(devtools)
+#install_github("lilywang1988/eSIR")
+library(eSIR) 
+
+set.seed(20192020)
+
 pdf(file=sprintf("COVID-19 prophet %s.pdf", Sys.Date()),paper="a4r",width=14, height=14) # apro il device
 
-datx <- covid19_italy_df
-
-test <- datx %>%
-  pivot_longer(
-    cols = c("confirmed","active","recovered","death"),
-    names_to = "cases",
-    values_drop_na = TRUE
-  )
-
-for (casetype in c("confirmed","active","recovered","death")) {
+if(TRUE) {
   
-  df <- test %>% filter(cases==casetype & value>100) %>% mutate(ds=date,y=log(value)) %>% select (ds,y) %>% arrange(ds)
-  #df <- covid19_italy_df %>% filter(active>0) %>% mutate(ds=date,y=log10(active)) %>% select (ds,y) %>% arrange(ds)
-  m <- prophet(df,growth = "linear",yearly.seasonality = FALSE, weekly.seasonality = FALSE, daily.seasonality = FALSE,fit=FALSE,
-               changepoint_range=0.98,
-               changepoint.prior.scale = 0.05,
-               interval.width = 0.95)
-  m <-fit.prophet(m, df)
-  future <- make_future_dataframe(m, periods= 5)
-  forecast <- predict(m, future)
-  p <- plot(m, forecast) + add_changepoints_to_plot(m) + ggtitle(casetype)
-  print(p)
-}
-
-
-
-
-
-###
-if(TRUE){
+  datx <- covid19_italy_df
   
-  library(deSolve)
+  test <- datx %>%
+    pivot_longer(
+      cols = c("confirmed","active","recovered","death"),
+      names_to = "cases",
+      values_drop_na = TRUE
+    )
+  
+  ### trend analysis with Facebook Prophet
+  # https://facebook.github.io/prophet/
+  
+  for (casetype in c("confirmed","active","recovered","death")) {
+    
+    df <- test %>% filter(cases==casetype & value>100) %>% mutate(ds=date,y=log(value)) %>% select (ds,y) %>% arrange(ds)
+    #df <- covid19_italy_df %>% filter(active>0) %>% mutate(ds=date,y=log10(active)) %>% select (ds,y) %>% arrange(ds)
+    m <- prophet(df,growth = "linear",yearly.seasonality = FALSE, weekly.seasonality = FALSE, daily.seasonality = FALSE,fit=FALSE,
+                 changepoint_range=0.98,
+                 changepoint.prior.scale = 0.05,
+                 interval.width = 0.95)
+    m <-fit.prophet(m, df)
+    future <- make_future_dataframe(m, periods= 5)
+    forecast <- predict(m, future)
+    p <- plot(m, forecast) + add_changepoints_to_plot(m) + ggtitle(casetype)
+    print(p)
+  }
+  
+  
+  
+  ### Fitting a simple SIR model with actual data in order to calculate R0
+  # https://blog.ephorie.de/epidemiology-how-contagious-is-novel-coronavirus-2019-ncov
   
   Infected <- covid19_italy_df %>% filter(date > as.Date("2020-02-27")) %>% pull(confirmed)
   Day <- 1:(length(Infected))
@@ -651,20 +662,53 @@ if(TRUE){
   max_infected * 0.007 # deaths with supposed 0.7% fatality rate
   ## [1] 68355.85
   
-}
-
-###
-
-if(TRUE){
   
-  ### https://github.com/lilywang1988/eSIR
   
-  #library(devtools)
-  #install_github("lilywang1988/eSIR")
+  ###
   
-  library(eSIR) 
+  ### herd_immunity scenario
+  # data fitted until 8 March 2020, before national lockdown, because in this scenario we try to predict what happened if no lockdown would be declared.
   
-  set.seed(20192020)
+  NI_before_ld <- covid19_italy_df %>% filter(date >= StartDay & date <=as.Date("2020/03/08")) %>% pull(confirmed) #infected
+  RI_before_ld <- covid19_italy_df %>% filter(date >= StartDay & date <=as.Date("2020/03/08")) %>% mutate(R=death+recovered) %>% pull(R) #recovered (including death)
+  N <- covid19_italy_df %>% filter (date==max(covid19_country_df$date)-1) %>% pull(max(population)) # population 
+  death_in_R <- covid19_italy_df %>% filter(date==max(covid19_country_df$date)-1) %>% mutate(DR=death/(death+recovered)) %>% pull(DR) #death rate
+  beta0 <- Opt_par["beta"]
+  gamma0 <- Opt_par["gamma"]
+  
+  Day <- 1:(length(NI_before_ld))
+  
+  EndDay <- StartDay+tail(Day, n=1)-1
+  
+  country <- covid19_italy_df %>% filter (date==max(covid19_country_df$date)-1) %>% pull(country)
+  
+  
+  R <- RI_before_ld/N
+  Y <- NI_before_ld/N- R 
+  
+  
+  # ### without pi(t), the standard state-space SIR model without intervention
+  # res.no_lockdown <- tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
+  #                       casename=sprintf("%s_no_lockdown",country),
+  #                      save_files = F, save_mcmc=F,save_plot_data = T,add_death =T,
+  #                       M=5e3,nburnin = 2e3)
+  # print(res.no_lockdown$plot_infection)
+  # print(res.no_lockdown$plot_removed)
+   
+  ### a SIR model with a time-varying transmission rate - Step function of pi(t)
+  change_time <- c("02/21/2020")
+  pi0<- c(1.0,0.9)
+  res.herd_immunity <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
+                          pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%s_herd_immunity",country),
+                          save_files = T, save_mcmc=T,save_plot_data = T,add_death =T,
+                          M=5e3,nburnin = 2e3)
+  print(res.herd_immunity$plot_infection)
+  print(res.herd_immunity$plot_removed)
+  
+  
+  ### actual scenarios: lockdown with no reopen, early reopen and late reopen
+  # data fitted until now because our SIR model with a time-varying transmission rate tries to model the changes in transmission due to national lockdown
+  
   StartDay <-  min(covid19_italy_df$date)
   NI_complete <- covid19_italy_df %>% filter(date >= StartDay) %>% pull(confirmed) #infected
   RI_complete <- covid19_italy_df %>% filter(date >= StartDay) %>% mutate(R=death+recovered) %>% pull(R) #recovered (including death)
@@ -684,24 +728,55 @@ if(TRUE){
   Y <- NI_complete/N- R 
   
   
+  ### scenario with lockdoown and no reopen
   
-  # ### without pi(t), the standard state-space SIR model without intervention
-  # res.nopi <- tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=150,
-  #                      casename=sprintf("%s_nopi",country),save_files = F,save_plot_data = F,
-  #                      M=5e3,nburnin = 2e3)
-  # print(res.nopi$plot_infection)
-  # print(res.nopi$plot_removed)
-  
-  ### a SIR model with a time-varying transmission rate - Step function of pi(t)
   change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020")
-  pi0<- c(1.0,0.9,0.4,0.2,0.1)
-  res.step <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
-                      pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%s_step",country),
-                      save_files = F, save_mcmc=F,save_plot_data = F,add_death =T,
-                      M=5e3,nburnin = 2e3)
-  print(res.step$plot_infection)
-  print(res.step$plot_removed)
+  pi0<- c(1.0,0.9,0.4,0.2,0.15)
+
+  # pi_t <- data.frame(
+  #     x = as.Date(c("01/31/2020","02/21/2020","03/08/2020","03/10/2020","03/21/2020","04/13/2020"),"%m/%d/%Y",origin="2020-01-31"),
+  #     y =c(1.0,0.9,0.4,0.2,0.15,0.15))
+  # ggplot(pi_t, aes(x,y)) + geom_step() #Ploting the pi_t step function
   
+  res.lockdown <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
+                      pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%s_lockdown",country),
+                      save_files = T, save_mcmc=T,save_plot_data = T,add_death =T,
+                      M=5e3,nburnin = 2e3)
+  print(res.lockdown$plot_infection)
+  print(res.lockdown$plot_removed)
+  
+  ### scenario with lockdown and an early reopen after Easter, with a gradual return to usual routine until 2nd of June
+  
+  change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020","04/14/2020","05/08/2020","06/03/2020")
+  pi0<- c(1.0,0.9,0.4,0.2,0.15,0.4,0.6,1.0)
+  res.after_easter_reopen <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
+                      pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%safter_easter_reopen",country),
+                      save_files = T, save_mcmc=T,save_plot_data = T,add_death =T,
+                      M=5e3,nburnin = 2e3)
+  print(res.after_easter_reopen$plot_infection)
+  print(res.after_easter_reopen$plot_removed)
+  
+  ### scenario with lockdown and an late reopen after first of May weekend, with a gradual return to usual routine until 2nd of June
+  
+  change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020","05/08/2020","06/03/2020")
+  pi0<- c(1.0,0.9,0.4,0.2,0.15,0.5,1.0)
+  res.after_1_may_reopen <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
+                             pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%sstep_after_1_may_reopen",country),
+                             save_files = T, save_mcmc=T,save_plot_data = T,add_death =T,
+                             M=5e3,nburnin = 2e3)
+  print(res.after_1_may_reopen$plot_infection)
+  print(res.after_1_may_reopen$plot_removed)
+  
+  ### scenario with lockdown and an late  and immediate reopen after 2nd of June
+  
+  change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020","06/03/2020")
+  pi0<- c(1.0,0.9,0.4,0.2,0.15,1.0)
+  res.after_2_june_reopen <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
+                                    pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%safter_2_june_reopen",country),
+                                    save_files = T, save_mcmc=T,save_plot_data = T,add_death =T,
+                                    M=5e3,nburnin = 2e3)
+  print(res.after_2_june_reopen$plot_infection)
+  print(res.after_2_june_reopen$plot_removed)
   
   # ### SIR with time-varying quarantine, which follows a Dirac Delta function rho(t)
   # change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020")
@@ -712,23 +787,11 @@ if(TRUE){
   #                   M=5e3,nburnin = 2e3)
   # 
   # print(res.q$plot_infection)
-  # print(res.q$plot_removed)
-  
-  
-  change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020","04/14/2020","05/08/2020","06/03/2020")
-  pi0<- c(1.0,0.9,0.4,0.2,0.1,0.4,0.6,1.0)
-  res.step_reopen <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
-                      pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%sstep_reopen",country),
-                      save_files = F, save_mcmc=F,save_plot_data = F,add_death =T,
-                      M=5e3,nburnin = 2e3)
-  print(res.step_reopen$plot_infection)
-  print(res.step_reopen$plot_removed)
-  
-  
+  # print(res.q$plot_removed) 
   ### 
+
+
 }
-
-
 ### end italy 
 dev.off() # lo chiudo
 #
