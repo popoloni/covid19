@@ -3,7 +3,7 @@
 
 2020-04-05 by [Enrico Papalini](https://www.linkedin.com/in/enricopapalini/)
 
-A [printable version](Article.pdf) of this article, updated to 4 April 2020.
+A [printable version](Article.pdf) of this article, updated to 4 April 2020. On this repository results are updated daily at about 19:00 CEST.
 
 Introduction
 -------
@@ -72,6 +72,12 @@ If Italy were fully reopened after First of May 2020, the number of infected peo
 
 ![Italy_lockdown after_1may_reopen Infected](data/Italystep_after_1_may_reopen_forecast.png)
 
+Re-opening Italy after 18 of May 
+-------
+
+On 7 April, italian news papers reported rumors about a possible gradual reopening starting from 4 or 8 of May (only major italian factories) and continuining on 18 of May for schools. Modelling this reopenoning with *π*(*t*) as reverse step function rising from 0.2 to 1 drirng May, we discover that also this scenario will open italy to early to avoid a new COVID-19 spread.
+
+![Italy_lockdown after_1may_reopen Infected](data/Italy_after_1_may_and_18_reopen_forecast.png)
 
 Re-opening Italy after Second of June
 -------
@@ -93,9 +99,22 @@ In order to try to estimate the positive effect of the current lockdown strategy
 Final remarks: #STAYATHOME
 -------
 
-Our study suggests to continue to stay quarantined until end of May in order to avoid the COVID-19 spread. Italian people will be making genuine sacrifices staying lock down for about three months but this is the only solution our models suggest. We hope for the rapid discovery of a vaccine that can change this scenario but it is unrealistic to happen within three months.
+Our study suggests to continue to stay completely quarantined until end of May in order to avoid the COVID-19 spread. Italian people will be making genuine sacrifices staying lock down for about three months but this is the only solution our models suggest. We hope for the rapid discovery of a vaccine that can change this scenario but it is unrealistic to happen within three months.
 
 The graphs on this article have been calculated based on Italian Protezione Civile data until 4 April 2020. Graphs will be regularly updated when new data are available running the [code in the repository](R/covid-19.R).
+
+On 6 April Peter Song was glad someone from Italy was using his R library and Lili Wang confirmed my model:
+>Hi Enrico,
+
+>Your analyses look good to me! I personally a lot of information in your manuscript. Thank you for sharing this with us. It is definitely okay to increase the transmission rate modifier back. I did some analysis to forecast how stringent and how long the strict control needs to last in China to avoid a second outbreak, which is similar to what you have done here. I want to share with you two graphs I did for Italy. Note that I used the cluster so I ran the MCMC chain for longer, which might cause some difference with the results you were sharing on the GitHub. The shorter chain would make the analysis more sensitive to the priors you set. The conclusion from my analysis was that the lockdown and keep social distance in Italy has been taking effect! The increase in cases started to slow down two weeks ago.
+
+> I was so moved by many recent video shot for Italian musicians' performances on their balconies. As a story said that music cannot be quarantined. I hope people in Italy can get over it soon, so as everybody on the earth. Please let me if you have further questions. 
+
+>Take care and stay safe!
+
+>Best,
+Lili
+
 
 ### A special thanks to 
 1. Song, P. X., Wang, L., Zhou, Y., He, J., Zhu, B., Wang, F., ... & Eisenberg, M. (2020). An epidemiological forecast model and software assessing interventions on COVID-19 epidemic in China. medRxiv.

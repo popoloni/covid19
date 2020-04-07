@@ -767,6 +767,20 @@ if(TRUE) {
   print(res.after_1_may_reopen$plot_infection)
   print(res.after_1_may_reopen$plot_removed)
   
+  
+  ### scenario with lockdown and a slow reopen after first of May weekend, with a gradual return to usual routine until 2nd of June
+  
+  change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020","05/08/2020","05/18/2020","06/03/2020")
+  pi0<- c(1.0,0.9,0.4,0.2,0.15,0.2,0.5,1.0)
+  res.after_1_may_and_18_reopen <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
+                                    pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%s_after_1_may_and_18_reopen",country),
+                                    save_files = T, save_mcmc=T,save_plot_data = T,add_death =T,
+                                    M=5e3,nburnin = 2e3)
+  print(res.after_1_may_and_18_reopen$plot_infection)
+  print(res.after_1_may_and_18_reopen$plot_removed)
+  
+  
+  
   ### scenario with lockdown and an late  and immediate reopen after 2nd of June
   
   change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020","06/03/2020")
