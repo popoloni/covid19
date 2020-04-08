@@ -15,7 +15,7 @@ showtext_auto()
 library(myriad)
 import_myriad_semi()
 
-
+#library(plotly)
 
 mytheme <- theme_myriad_semi() +
   theme(plot.title = element_text(size = rel(2), face = "bold"),
@@ -549,3 +549,6 @@ print(plot_deaths_rolling)
 print(cov_death_sm)
 dev.off()
 
+
+#p <- ggplotly(plot_cases)
+#p

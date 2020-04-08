@@ -344,7 +344,7 @@ for (useBIG in c(FALSE,TRUE)) {
     if (useWorld){
       
       
-      country_subset <- sort(covid19_country_df%>% filter(date==max(covid19_country_df$date)-1&!(country %in% excludelist)) %>% arrange (desc(confirmed)) %>%top_n(ntop,confirmed) %>% pull(country)) #sort(c("France", "Spain", "Germany", "Italy","UK","US","China")) 
+      country_subset <- sort(covid19_country_df%>% filter(date==max(covid19_country_df$date, na.rm = TRUE)-1&!(country %in% excludelist)) %>% arrange (desc(confirmed)) %>%top_n(ntop,confirmed) %>% pull(country)) #sort(c("France", "Spain", "Germany", "Italy","UK","US","China")) 
       datx <- subset(covid19_country_df, country %in% country_subset)
       
       if (!useBIG) {
@@ -384,7 +384,7 @@ for (useBIG in c(FALSE,TRUE)) {
     
     xyp <- xyplot(confirmed ~ date | country, data = daty,type = c("o"),
                   scales = list(y = list(relation = "free", rot = 0), x = list(rot = 45, format = "%Y-%m-%d")), 
-                  layout = c(nx, ny), main = sprintf("%s - Confirmed cases of COVID-19\n(last date in this graph is %s)", mytitle, max(daty$date)),grid = TRUE,
+                  layout = c(nx, ny), main = sprintf("%s - Confirmed cases of COVID-19\n(last date in this graph is %s)", mytitle, max(daty$date, na.rm = TRUE)),grid = TRUE,
                   panel = function(x,y,...) { 
                     panel.xyplot(x, y, col=col[panel.number()], pch=20, ...)
                   })
@@ -392,7 +392,7 @@ for (useBIG in c(FALSE,TRUE)) {
     
     xyp <- xyplot(log10(confirmed) ~ date | country, data = daty, type = c("o"), 
                   scales = list(y = list(relation = "free", rot = 0), x = list(rot = 45, format = "%Y-%m-%d")), 
-                  layout = c(nx, ny), main = sprintf("%s - Log 10 Confirmed cases of COVID-19\n(last date in this graph is %s)", mytitle, max(daty$date)),grid = TRUE,
+                  layout = c(nx, ny), main = sprintf("%s - Log 10 Confirmed cases of COVID-19\n(last date in this graph is %s)", mytitle, max(daty$date, na.rm = TRUE)),grid = TRUE,
                   panel = function(x,y,...) { 
                     panel.xyplot(x, y, col=col[panel.number()], pch=20, ...)
                   })
@@ -400,7 +400,7 @@ for (useBIG in c(FALSE,TRUE)) {
     
     xyp <- xyplot(log10(active) ~ date | country, data = daty, type = c("o"), 
                   scales = list(y = list(relation = "free", rot = 0), x = list(rot = 45, format = "%Y-%m-%d")), 
-                  layout = c(nx, ny), main = sprintf("%s - Log 10 Active cases of COVID-19\n(last date in this graph is %s)", mytitle, max(daty$date)),grid = TRUE,
+                  layout = c(nx, ny), main = sprintf("%s - Log 10 Active cases of COVID-19\n(last date in this graph is %s)", mytitle, max(daty$date, na.rm = TRUE)),grid = TRUE,
                   panel = function(x,y,...) { 
                     panel.xyplot(x, y, col=col[panel.number()], pch=20, ...)
                   })
@@ -422,7 +422,21 @@ for (useBIG in c(FALSE,TRUE)) {
     
     datx <- datx[, days_since_case_on := (as.integer(date) - as.integer(min(date[active > cases_minimum]))), by = list(country)]
     datx <- datx[, newly_active       := as.integer(active - shift(active, n = 1, type = "lead")),        by = list(country)]
+
     
+    datx <- datx %>%
+      group_by(country) %>%
+      drop_na(country) %>%
+      arrange(date) %>%
+      mutate(
+             rl_confirmed  = rollapply(newly_confirmed,7,mean,align='right',fill=NA),
+             rl_deaths     = rollapply(newly_dead,7,mean,align='right',fill=NA),
+             rl_recovered  = rollapply(newly_recovered,7,mean,align='right',fill=NA),
+             rl_active     = rollapply(newly_active,7,mean,align='right',fill=NA)
+             ) %>% ungroup()
+
+    
+        
     mykey <- list(title="Countries",
                   space="right",
                   text=list(country_subset),
@@ -460,14 +474,26 @@ for (useBIG in c(FALSE,TRUE)) {
                   pch=1:length(country_subset),col=col,lwd = 2,grid = TRUE) 
     print(xyp)
     
-    
+
+    # daily new deaths (7 days averange) vs days
+    xyp <- xyplot(rl_deaths ~ days_since_case_ondeath | paste(mytitle,"Daily deaths (weekly moving averange)",sep=" - "), 
+                  groups = country,
+                  data = subset(datx, days_since_case_ondeath >= 0 ),
+                  xlab = paste0("Days since nr deaths was  ",cases_minimum), 
+                  ylab = "number of cases (7 days rolling mean)",
+                  grid = TRUE,
+                  key = mykey,
+                  type = "o", pch=1:length(country_subset),col=col,lwd = 2,
+                  scales = list(x = list(at = seq(0,max(datx$days_since_case_ondeath, na.rm = TRUE), by =5)))
+    )
+    print(xyp)    
     
     test <- datx %>%
       pivot_longer(
-        cols = c("confirmed","active","recovered","death"),
+        cols = c("newly_confirmed","newly_active","newly_recovered","newly_dead","rl_confirmed","rl_active","rl_recovered","rl_deaths","confirmed","active","recovered","death"),
         names_to = "cases",
         values_drop_na = TRUE
-      )
+      ) %>% drop_na()
     
     # log(10) of totally confirmed cases vs days
     xyp <- xyplot(value ~ date | factor(cases,levels=c("recovered","death","confirmed","active")), groups = country,
@@ -480,11 +506,24 @@ for (useBIG in c(FALSE,TRUE)) {
     print(xyp)
     
     
+    # daily new cases (7 days averange) vs days
+    xyp <- xyplot(value ~ days_since_case_ondeath | factor(cases,levels=c("rl_recovered","rl_deaths","rl_confirmed","rl_active")), 
+                  groups = country,
+                  data = subset(test, days_since_case_ondeath >= 0 ),
+                  xlab = paste0("Days since nr deaths was  ",cases_minimum), 
+                  ylab = "number of cases (7 days rolling mean)",
+                  grid = TRUE,
+                  key = mykey,
+                  type = "o", pch=1:length(country_subset),col=col,lwd = 2,
+                  scales = list(x = list(at = seq(0,max(test$days_since_case_ondeath, na.rm = TRUE), by =5)))
+                  )
+    print(xyp)
+    
     # log(10) of confirmed cases vs days since reach 100 cases
     xyp<-xyplot(confirmed ~ days_since_case_onset |  paste0(mytitle," - ","confirmed cases of COVID-19 since onset of sick person nr ",cases_minimum), 
                 groups = country,
                 data = subset(datx, days_since_case_onset >= 0 ), 
-                scales = list(y = list(log = 10),x = list(at = seq(0,max(datx$days_since_case_onset), by =5))),
+                scales = list(y = list(log = 10),x = list(at = seq(0,max(datx$days_since_case_onset, na.rm = TRUE), by =5))),
                 xlab = paste0("Days since COVID-19 onset - confirmed case ",cases_minimum), ylab = "number of confirmed cases",
                 #key = mykey,
                 yscale.components = yscale.components.log10ticks,
@@ -590,8 +629,8 @@ if(TRUE) {
   
   Infected <- covid19_italy_df %>% filter(date > as.Date("2020-02-27")) %>% pull(confirmed)
   Day <- 1:(length(Infected))
-  N <- covid19_italy_df %>% filter (date==max(covid19_country_df$date)-1) %>% pull(max(population)) # population 
-  country <- covid19_italy_df %>% filter (date==max(covid19_country_df$date)-1) %>% pull(country)
+  N <- covid19_italy_df %>% filter (date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% pull(max(population, na.rm = TRUE)) # population 
+  country <- covid19_italy_df %>% filter (date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% pull(country)
   
   old <- par(mfrow = c(1, 2))
   plot(Day, Infected, type ="b")
@@ -647,11 +686,11 @@ if(TRUE) {
   ##       R0 
   ## 1.799227
   
-  fit[fit$I == max(fit$I), "I", drop = FALSE] # height of pandemic
+  fit[fit$I == max(fit$I, na.rm = TRUE), "I", drop = FALSE] # height of pandemic
   ##          I
   ## 54 9765121
   
-  max_infected <- max(fit$I)
+  max_infected <- max(fit$I, na.rm = TRUE)
   max_infected / 5 # severe cases
   ## [1] 1953024
   
@@ -668,11 +707,11 @@ if(TRUE) {
   
   ### herd_immunity scenario
   # data fitted until 8 March 2020, before national lockdown, because in this scenario we try to predict what happened if no lockdown would be declared.
-  
+  StartDay <-  min(covid19_italy_df$date)
   NI_before_ld <- covid19_italy_df %>% filter(date >= StartDay & date <=as.Date("2020/03/08")) %>% pull(confirmed) #infected
   RI_before_ld <- covid19_italy_df %>% filter(date >= StartDay & date <=as.Date("2020/03/08")) %>% mutate(R=death+recovered) %>% pull(R) #recovered (including death)
-  N <- covid19_italy_df %>% filter (date==max(covid19_country_df$date)-1) %>% pull(max(population)) # population 
-  death_in_R <- covid19_italy_df %>% filter(date==max(covid19_country_df$date)-1) %>% mutate(DR=death/(death+recovered)) %>% pull(DR) #death rate
+  N <- covid19_italy_df %>% filter (date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% pull(max(population, na.rm = TRUE)) # population 
+  death_in_R <- covid19_italy_df %>% filter(date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% mutate(DR=death/(death+recovered)) %>% pull(DR) #death rate
   beta0 <- Opt_par["beta"]
   gamma0 <- Opt_par["gamma"]
   
@@ -680,7 +719,7 @@ if(TRUE) {
   
   EndDay <- StartDay+tail(Day, n=1)-1
   
-  country <- covid19_italy_df %>% filter (date==max(covid19_country_df$date)-1) %>% pull(country)
+  country <- covid19_italy_df %>% filter (date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% pull(country)
   
   
   R <- RI_before_ld/N
@@ -709,11 +748,11 @@ if(TRUE) {
   ### actual scenarios: lockdown with no reopen, early reopen and late reopen
   # data fitted until now because our SIR model with a time-varying transmission rate tries to model the changes in transmission due to national lockdown
   
-  StartDay <-  min(covid19_italy_df$date)
+
   NI_complete <- covid19_italy_df %>% filter(date >= StartDay) %>% pull(confirmed) #infected
   RI_complete <- covid19_italy_df %>% filter(date >= StartDay) %>% mutate(R=death+recovered) %>% pull(R) #recovered (including death)
-  N <- covid19_italy_df %>% filter (date==max(covid19_country_df$date)-1) %>% pull(max(population)) # population 
-  death_in_R <- covid19_italy_df %>% filter(date==max(covid19_country_df$date)-1) %>% mutate(DR=death/(death+recovered)) %>% pull(DR) #death rate
+  N <- covid19_italy_df %>% filter (date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% pull(max(population, na.rm = TRUE)) # population 
+  death_in_R <- covid19_italy_df %>% filter(date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% mutate(DR=death/(death+recovered)) %>% pull(DR) #death rate
   beta0 <- Opt_par["beta"]
   gamma0 <- Opt_par["gamma"]
   
@@ -721,7 +760,7 @@ if(TRUE) {
   
   EndDay <- StartDay+tail(Day, n=1)-1
   
-  country <- covid19_italy_df %>% filter (date==max(covid19_country_df$date)-1) %>% pull(country)
+  country <- covid19_italy_df %>% filter (date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% pull(country)
   
   
   R <- RI_complete/N
