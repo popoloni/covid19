@@ -9,6 +9,16 @@ library(dplyr)
 library(tidyr)
 library(wbstats)
 library(data.table)
+library(prophet)
+library(ggplot2)
+library(zoo)
+library(deSolve)
+
+### https://github.com/lilywang1988/eSIR
+#library(devtools)
+#install_github("lilywang1988/eSIR")
+library(eSIR)
+
 
 setwd("D:/OneDrive/data/covid19/data")
 
@@ -303,74 +313,104 @@ write.csv(covid19_country_df %>% distinct(country) %>% arrange(country),sprintf(
 
 
 ##
-for (useBIG in c(FALSE,TRUE)) {
-  
-  if (!useBIG) {
-    ntop=12
-    nx=4
-    ny=3
-    BIGlabel=""
-    excludelist = c("China","South Korea","Japan") 
-    cases_minimum = 50
-    
+for (useWorld in c(TRUE, FALSE)) {
+  if (!useWorld) {
+    BIGlabel = "ITALY "
   } else {
-    ntop=24
-    nx=4
-    ny=3
-    BIGlabel="BIG "
-    excludelist = c()
-    cases_minimum = 100
-    
+    BIGlabel = "WORLD "
   }
   
-  
-  pdf(file=sprintf("COVID-19 graphs %s%s.pdf",BIGlabel, Sys.Date()),paper="a4r",width=14, height=14) # apro il device
-  
-  ## some grphics based on
-  ## https://www.bnosac.be/index.php/blog
-  
-  
-  lattice.theme <- trellis.par.get()
-  lattice.options(default.theme = standard.theme(color = FALSE))
+  pdf(
+    file = sprintf("COVID-19 graphs %s%s.pdf", BIGlabel, Sys.Date()),
+    paper = "a4r",
+    width = 14,
+    height = 14
+  ) # apro il device
   
   
-  trellis.par.set(strip.background = list(col = "grey"))
-  qual_col_pals <- brewer.pal.info[brewer.pal.info$category == 'qual',]
-  col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
-  
-  
-  for (useWorld in c(TRUE,FALSE)) {
+  for (useBIG in c(FALSE, TRUE)) {
+    if (!useBIG) {
+      ntop = 9
+      nx = 3
+      ny = 3
+      
+      excludelist = c("China", "South Korea", "Japan", "US", "Iran")
+      cases_minimum = 50
+      
+    } else {
+      ntop = 24
+      nx = 4
+      ny = 3
+      
+      excludelist = c()
+      cases_minimum = 100
+      
+    }
     
-    if (useWorld){
-      
-      
-      country_subset <- sort(covid19_country_df%>% filter(date==max(covid19_country_df$date, na.rm = TRUE)-1&!(country %in% excludelist)) %>% arrange (desc(confirmed)) %>%top_n(ntop,confirmed) %>% pull(country)) #sort(c("France", "Spain", "Germany", "Italy","UK","US","China")) 
-      datx <- subset(covid19_country_df, country %in% country_subset)
+    
+    
+    
+    ## some grphics based on
+    ## https://www.bnosac.be/index.php/blog
+    
+    
+    lattice.theme <- trellis.par.get()
+    lattice.options(default.theme = standard.theme(color = FALSE))
+    
+    
+    trellis.par.set(strip.background = list(col = "grey"))
+    qual_col_pals <-
+      brewer.pal.info[brewer.pal.info$category == 'qual', ]
+    col_vector = unlist(mapply(
+      brewer.pal,
+      qual_col_pals$maxcolors,
+      rownames(qual_col_pals)
+    ))
+    
+    
+    
+    
+    if (useWorld) {
+      country_subset <-
+        sort(
+          covid19_country_df %>% filter(
+            date == max(covid19_country_df$date, na.rm = TRUE) - 1 &
+              !(country %in% excludelist)
+          ) %>% arrange (desc(confirmed)) %>% top_n(ntop, confirmed) %>% pull(country)
+        ) #sort(c("France", "Spain", "Germany", "Italy","UK","US","China"))
+      datx <-
+        subset(covid19_country_df, country %in% country_subset)
       
       if (!useBIG) {
         col <- brewer.pal(length(country_subset), "Paired")
       } else {
-        col <-col_vector[1:length(country_subset)]
+        col <- col_vector[1:length(country_subset)]
       }
       mytitle <- "WORLD"
     } else {
-      temp <- covid19_raw_df%>% filter(date==max(covid19_country_df$date)-1 & country=="Italy") %>% arrange (desc(confirmed)) %>% ungroup()
+      temp <-
+        covid19_raw_df %>% filter(date == max(covid19_country_df$date) - 1 &
+                                    country == "Italy") %>% arrange (desc(confirmed)) %>% ungroup()
       i <- sapply(temp, is.factor)
       temp[i] <- lapply(temp[i], as.character)
-      region_subset <- sort(temp %>% top_n(ntop,confirmed) %>% pull(region)) 
-      datx <- subset(covid19_raw_df, region %in% region_subset) %>% ungroup() %>% mutate(country=region)
+      region_subset <-
+        sort(temp %>% top_n(ntop, confirmed) %>% pull(region))
+      datx <-
+        subset(covid19_raw_df, region %in% region_subset) %>% ungroup() %>% mutate(country =
+                                                                                     region)
       #names(datx)[names(datx) == "country"] <- "state"
       #names(datx)[names(datx) == "region"] <- "country"
-      datx <- datx %>% 
-        mutate(active = confirmed - death-recovered) %>%
-        arrange(date,country)
-      country_subset <- region_subset #sort(levels(region_subset)[as.integer(region_subset)])
+      datx <- datx %>%
+        mutate(active = confirmed - death - recovered) %>%
+        arrange(date, country)
+      country_subset <-
+        region_subset #sort(levels(region_subset)[as.integer(region_subset)])
       i <- sapply(datx, is.factor)
       datx[i] <- lapply(datx[i], as.character)
       if (!useBIG) {
         col <- brewer.pal(length(country_subset), "Set3")
       } else {
-        col <-col_vector[1:length(country_subset)]
+        col <- col_vector[1:length(country_subset)]
       }
       mytitle <- "ITALY"
     }
@@ -382,473 +422,914 @@ for (useBIG in c(FALSE,TRUE)) {
     #col <- sample(color,length(country_subset))
     
     
-    xyp <- xyplot(confirmed ~ date | country, data = daty,type = c("o"),
-                  scales = list(y = list(relation = "free", rot = 0), x = list(rot = 45, format = "%Y-%m-%d")), 
-                  layout = c(nx, ny), main = sprintf("%s - Confirmed cases of COVID-19\n(last date in this graph is %s)", mytitle, max(daty$date, na.rm = TRUE)),grid = TRUE,
-                  panel = function(x,y,...) { 
-                    panel.xyplot(x, y, col=col[panel.number()], pch=20, ...)
-                  })
+    xyp <-
+      xyplot(
+        confirmed ~ date | country,
+        data = daty,
+        type = c("o"),
+        scales = list(
+          y = list(relation = "free", rot = 0),
+          x = list(rot = 45, format = "%Y-%m-%d")
+        ),
+        layout = c(nx, ny),
+        main = sprintf(
+          "%s - Confirmed cases of COVID-19\n(last date in this graph is %s)",
+          mytitle,
+          max(daty$date, na.rm = TRUE)
+        ),
+        grid = TRUE,
+        panel = function(x, y, ...) {
+          panel.xyplot(x, y, col = col[panel.number()], pch = 20, ...)
+        }
+      )
     print(xyp)
     
-    xyp <- xyplot(log10(confirmed) ~ date | country, data = daty, type = c("o"), 
-                  scales = list(y = list(relation = "free", rot = 0), x = list(rot = 45, format = "%Y-%m-%d")), 
-                  layout = c(nx, ny), main = sprintf("%s - Log 10 Confirmed cases of COVID-19\n(last date in this graph is %s)", mytitle, max(daty$date, na.rm = TRUE)),grid = TRUE,
-                  panel = function(x,y,...) { 
-                    panel.xyplot(x, y, col=col[panel.number()], pch=20, ...)
-                  })
+    xyp <-
+      xyplot(
+        log10(confirmed) ~ date | country,
+        data = daty,
+        type = c("o"),
+        scales = list(
+          y = list(relation = "free", rot = 0),
+          x = list(rot = 45, format = "%Y-%m-%d")
+        ),
+        layout = c(nx, ny),
+        main = sprintf(
+          "%s - Log 10 Confirmed cases of COVID-19\n(last date in this graph is %s)",
+          mytitle,
+          max(daty$date, na.rm = TRUE)
+        ),
+        grid = TRUE,
+        panel = function(x, y, ...) {
+          panel.xyplot(x, y, col = col[panel.number()], pch = 20, ...)
+        }
+      )
     print(xyp)
     
-    xyp <- xyplot(log10(active) ~ date | country, data = daty, type = c("o"), 
-                  scales = list(y = list(relation = "free", rot = 0), x = list(rot = 45, format = "%Y-%m-%d")), 
-                  layout = c(nx, ny), main = sprintf("%s - Log 10 Active cases of COVID-19\n(last date in this graph is %s)", mytitle, max(daty$date, na.rm = TRUE)),grid = TRUE,
-                  panel = function(x,y,...) { 
-                    panel.xyplot(x, y, col=col[panel.number()], pch=20, ...)
-                  })
+    xyp <-
+      xyplot(
+        log10(active) ~ date | country,
+        data = daty,
+        type = c("o"),
+        scales = list(
+          y = list(relation = "free", rot = 0),
+          x = list(rot = 45, format = "%Y-%m-%d")
+        ),
+        layout = c(nx, ny),
+        main = sprintf(
+          "%s - Log 10 Active cases of COVID-19\n(last date in this graph is %s)",
+          mytitle,
+          max(daty$date, na.rm = TRUE)
+        ),
+        grid = TRUE,
+        panel = function(x, y, ...) {
+          panel.xyplot(x, y, col = col[panel.number()], pch = 20, ...)
+        }
+      )
     print(xyp)
     
     
-    datx <- datx[order(datx$date, datx$country, decreasing = TRUE), ]
-    datx<-setDT(datx, keep.rownames=TRUE, key=NULL, check.names=FALSE)
-
+    datx <-
+      datx[order(datx$date, datx$country, decreasing = TRUE),]
+    datx <-
+      setDT(
+        datx,
+        keep.rownames = TRUE,
+        key = NULL,
+        check.names = FALSE
+      )
     
-    datx <- datx[, days_since_case_onset := (as.integer(date) - as.integer(min(date[confirmed > cases_minimum]))), by = list(country)]
-    datx <- datx[, newly_confirmed       := as.integer(confirmed - shift(confirmed, n = 1, type = "lead")),        by = list(country)]
     
-    datx <- datx[, days_since_case_ondeath := (as.integer(date) - as.integer(min(date[death > cases_minimum]))), by = list(country)]
-    datx <- datx[, newly_dead       := as.integer(death - shift(death, n = 1, type = "lead")),        by = list(country)]
+    datx <-
+      datx[, days_since_case_onset := (as.integer(date) - as.integer(min(date[confirmed > cases_minimum]))), by = list(country)]
+    datx <-
+      datx[, newly_confirmed       := as.integer(confirmed - shift(confirmed, n = 1, type = "lead")),        by = list(country)]
     
-    datx <- datx[, days_since_case_onsafe := (as.integer(date) - as.integer(min(date[recovered > cases_minimum]))), by = list(country)]
-    datx <- datx[, newly_recovered       := as.integer(recovered - shift(recovered, n = 1, type = "lead")),        by = list(country)]
+    datx <-
+      datx[, days_since_case_ondeath := (as.integer(date) - as.integer(min(date[death > cases_minimum]))), by = list(country)]
+    datx <-
+      datx[, newly_dead       := as.integer(death - shift(death, n = 1, type = "lead")),        by = list(country)]
     
-    datx <- datx[, days_since_case_on := (as.integer(date) - as.integer(min(date[active > cases_minimum]))), by = list(country)]
-    datx <- datx[, newly_active       := as.integer(active - shift(active, n = 1, type = "lead")),        by = list(country)]
-
+    datx <-
+      datx[, days_since_case_onsafe := (as.integer(date) - as.integer(min(date[recovered > cases_minimum]))), by = list(country)]
+    datx <-
+      datx[, newly_recovered       := as.integer(recovered - shift(recovered, n = 1, type = "lead")),        by = list(country)]
+    
+    datx <-
+      datx[, days_since_case_on := (as.integer(date) - as.integer(min(date[active > cases_minimum]))), by = list(country)]
+    datx <-
+      datx[, newly_active       := as.integer(active - shift(active, n = 1, type = "lead")),        by = list(country)]
+    
     
     datx <- datx %>%
       group_by(country) %>%
       drop_na(country) %>%
       arrange(date) %>%
       mutate(
-             rl_confirmed  = rollapply(newly_confirmed,7,mean,align='right',fill=NA),
-             rl_deaths     = rollapply(newly_dead,7,mean,align='right',fill=NA),
-             rl_recovered  = rollapply(newly_recovered,7,mean,align='right',fill=NA),
-             rl_active     = rollapply(newly_active,7,mean,align='right',fill=NA)
-             ) %>% ungroup()
-
+        rl_confirmed  = rollapply(
+          newly_confirmed,
+          7,
+          mean,
+          align = 'right',
+          fill = NA
+        ),
+        rl_deaths     = rollapply(newly_dead, 7, mean, align = 'right', fill =
+                                    NA),
+        rl_recovered  = rollapply(
+          newly_recovered,
+          7,
+          mean,
+          align = 'right',
+          fill = NA
+        ),
+        rl_active     = rollapply(newly_active, 7, mean, align = 'right', fill =
+                                    NA)
+      ) %>% ungroup()
     
-        
-    mykey <- list(title="Countries",
-                  space="right",
-                  text=list(country_subset),
-                  points=list(pch=c(1:length(country_subset)), col=col),
-                  lines=list(col=col))
+    
+    
+    mykey <- list(
+      title = "Countries",
+      space = "right",
+      text = list(country_subset),
+      points = list(pch = c(1:length(country_subset)), col =
+                      col),
+      lines = list(col = col)
+    )
     
     mypanel <- function(x, y, ...) {
       panel.xyplot(x, y, ...)
-      panel.curve(log10(cases_minimum*2**(x/1)), from=0,  to=150, add=TRUE, type="l", col = "gray",lty=5) # raddoppia ogni giorno
-      panel.curve(log10(cases_minimum*2**(x/2)), from=0,  to=150, add=TRUE, type="l", col = "gray",lty=5)
-      panel.curve(log10(cases_minimum*2**(x/3)), from=0,  to=150, add=TRUE, type="l", col = "gray",lty=5)
-      panel.curve(log10(cases_minimum*2**(x/5)), from=0,  to=150, add=TRUE, type="l", col = "gray",lty=5)
-      panel.curve(log10(cases_minimum*2**(x/7)), from=0,  to=150, add=TRUE, type="l", col = "gray",lty=5)
-      panel.curve(log10(cases_minimum*2**(x/10)),from=0,  to=150, add=TRUE, type="l", col = "gray",lty=5)
+      panel.curve(
+        log10(cases_minimum * 2 ** (x / 1)),
+        from = 0,
+        to = 150,
+        add = TRUE,
+        type = "l",
+        col = "gray",
+        lty = 5
+      ) # raddoppia ogni giorno
+      panel.curve(
+        log10(cases_minimum * 2 ** (x / 2)),
+        from = 0,
+        to = 150,
+        add = TRUE,
+        type = "l",
+        col = "gray",
+        lty = 5
+      )
+      panel.curve(
+        log10(cases_minimum * 2 ** (x / 3)),
+        from = 0,
+        to = 150,
+        add = TRUE,
+        type = "l",
+        col = "gray",
+        lty = 5
+      )
+      panel.curve(
+        log10(cases_minimum * 2 ** (x / 5)),
+        from = 0,
+        to = 150,
+        add = TRUE,
+        type = "l",
+        col = "gray",
+        lty = 5
+      )
+      panel.curve(
+        log10(cases_minimum * 2 ** (x / 7)),
+        from = 0,
+        to = 150,
+        add = TRUE,
+        type = "l",
+        col = "gray",
+        lty = 5
+      )
+      panel.curve(
+        log10(cases_minimum * 2 ** (x / 10)),
+        from = 0,
+        to = 150,
+        add = TRUE,
+        type = "l",
+        col = "gray",
+        lty = 5
+      )
     }
     
     
     # totally confirmed cases vs days
-    xyp <- xyplot(confirmed ~ date | paste(mytitle,"Confirmed cases of COVID-19",sep=" - "), groups = country,
-                  data = subset(datx, date > as.Date("2020-03-01")), 
-                  xlab = "Date", ylab = "log10 of number of new COVID-19 cases",
-                  scales = list(x = list(rot = 45, format = "%Y-%m-%d", at = seq(as.Date("2020-03-01"), Sys.Date(), by = "2 days"))), 
-                  key = mykey, 
-                  type = "o", pch=1:length(country_subset),col=col,lwd = 2,grid = TRUE) 
+    xyp <-
+      xyplot(
+        confirmed ~ date |
+          paste(mytitle, "Confirmed cases of COVID-19", sep = " - "),
+        groups = country,
+        data = subset(datx, date > as.Date("2020-03-01")),
+        xlab = "Date",
+        ylab = "log10 of number of new COVID-19 cases",
+        scales = list(x = list(
+          rot = 45,
+          format = "%Y-%m-%d",
+          at = seq(as.Date("2020-03-01"), Sys.Date(), by = "2 days")
+        )),
+        key = mykey,
+        type = "o",
+        pch = 1:length(country_subset),
+        col = col,
+        lwd = 2,
+        grid = TRUE
+      )
     print(xyp)
     
     # log(10) of newly confirmed cases vs days
-    xyp <- xyplot(newly_confirmed ~ date | paste(mytitle,"Newly confirmed cases of COVID-19",sep=" - "), groups = country,
-                  data = subset(datx, date > as.Date("2020-03-01")), 
-                  xlab = "Date", ylab = "number of new COVID-19 cases", 
-                  yscale.components = yscale.components.log10ticks,
-                  scales = list(y = list(log = 10),x = list(rot = 45, format = "%Y-%m-%d", at = seq(as.Date("2020-03-01"), Sys.Date(), by = "2 days"))), 
-                  key = mykey, 
-                  type = c("p", "smooth"), #type = "o", 
-                  pch=1:length(country_subset),col=col,lwd = 2,grid = TRUE) 
+    xyp <-
+      xyplot(
+        newly_confirmed ~ date |
+          paste(mytitle, "Newly confirmed cases of COVID-19", sep = " - "),
+        groups = country,
+        data = subset(datx, date > as.Date("2020-03-01")),
+        xlab = "Date",
+        ylab = "number of new COVID-19 cases",
+        yscale.components = yscale.components.log10ticks,
+        scales = list(
+          y = list(log = 10),
+          x = list(
+            rot = 45,
+            format = "%Y-%m-%d",
+            at = seq(as.Date("2020-03-01"), Sys.Date(), by = "2 days")
+          )
+        ),
+        key = mykey,
+        type = c("p", "smooth"),
+        #type = "o",
+        pch = 1:length(country_subset),
+        col = col,
+        lwd = 2,
+        grid = TRUE
+      )
     print(xyp)
     
-
+    
     # daily new deaths (7 days averange) vs days
-    xyp <- xyplot(rl_deaths ~ days_since_case_ondeath | paste(mytitle,"Daily deaths (weekly moving averange)",sep=" - "), 
-                  groups = country,
-                  data = subset(datx, days_since_case_ondeath >= 0 ),
-                  xlab = paste0("Days since nr deaths was  ",cases_minimum), 
-                  ylab = "number of cases (7 days rolling mean)",
-                  grid = TRUE,
-                  key = mykey,
-                  type = "o", pch=1:length(country_subset),col=col,lwd = 2,
-                  scales = list(x = list(at = seq(0,max(datx$days_since_case_ondeath, na.rm = TRUE), by =5)))
-    )
-    print(xyp)    
+    xyp <-
+      xyplot(
+        rl_deaths ~ days_since_case_ondeath |
+          paste(mytitle, "Daily deaths (weekly moving averange)", sep = " - "),
+        groups = country,
+        data = subset(datx, days_since_case_ondeath >= 0),
+        xlab = paste0("Days since nr deaths was  ", cases_minimum),
+        ylab = "number of cases (7 days rolling mean)",
+        grid = TRUE,
+        key = mykey,
+        type = "o",
+        pch = 1:length(country_subset),
+        col = col,
+        lwd = 2,
+        scales = list(x = list(at = seq(
+          0, max(datx$days_since_case_ondeath, na.rm = TRUE), by = 5
+        )))
+      )
+    print(xyp)
     
     test <- datx %>%
       pivot_longer(
-        cols = c("newly_confirmed","newly_active","newly_recovered","newly_dead","rl_confirmed","rl_active","rl_recovered","rl_deaths","confirmed","active","recovered","death"),
+        cols = c(
+          "newly_confirmed",
+          "newly_active",
+          "newly_recovered",
+          "newly_dead",
+          "rl_confirmed",
+          "rl_active",
+          "rl_recovered",
+          "rl_deaths",
+          "confirmed",
+          "active",
+          "recovered",
+          "death"
+        ),
         names_to = "cases",
         values_drop_na = TRUE
       ) %>% drop_na()
     
     # log(10) of totally confirmed cases vs days
-    xyp <- xyplot(value ~ date | factor(cases,levels=c("recovered","death","confirmed","active")), groups = country,
-                  data = subset(test, date > as.Date("2020-03-01")), 
-                  xlab = "Date", ylab = "number of cases",
-                  yscale.components = yscale.components.log10ticks,
-                  scales = list(y = list(log = 10),x = list(rot = 45, format = "%Y-%m-%d", at = seq(as.Date("2020-03-01"), Sys.Date(), by = "2 days"))), 
-                  key = mykey, 
-                  type = "o", pch=1:length(country_subset),col=col,lwd = 2,grid = TRUE) 
+    xyp <-
+      xyplot(
+        value ~ date |
+          factor(
+            cases,
+            levels = c("recovered", "death", "confirmed", "active")
+          ),
+        groups = country,
+        data = subset(test, date > as.Date("2020-03-01")),
+        xlab = "Date",
+        ylab = "number of cases",
+        yscale.components = yscale.components.log10ticks,
+        scales = list(
+          y = list(log = 10),
+          x = list(
+            rot = 45,
+            format = "%Y-%m-%d",
+            at = seq(as.Date("2020-03-01"), Sys.Date(), by = "2 days")
+          )
+        ),
+        key = mykey,
+        type = "o",
+        pch = 1:length(country_subset),
+        col = col,
+        lwd = 2,
+        grid = TRUE
+      )
     print(xyp)
     
     
     # daily new cases (7 days averange) vs days
-    xyp <- xyplot(value ~ days_since_case_ondeath | factor(cases,levels=c("rl_recovered","rl_deaths","rl_confirmed","rl_active")), 
-                  groups = country,
-                  data = subset(test, days_since_case_ondeath >= 0 ),
-                  xlab = paste0("Days since nr deaths was  ",cases_minimum), 
-                  ylab = "number of cases (7 days rolling mean)",
-                  grid = TRUE,
-                  key = mykey,
-                  type = "o", pch=1:length(country_subset),col=col,lwd = 2,
-                  scales = list(x = list(at = seq(0,max(test$days_since_case_ondeath, na.rm = TRUE), by =5)))
-                  )
+    xyp <-
+      xyplot(
+        value ~ days_since_case_ondeath |
+          factor(
+            cases,
+            levels = c("rl_recovered", "rl_deaths", "rl_confirmed", "rl_active")
+          ),
+        groups = country,
+        data = subset(test, days_since_case_ondeath >= 0),
+        xlab = paste0("Days since nr deaths was  ", cases_minimum),
+        ylab = "number of cases (7 days rolling mean)",
+        grid = TRUE,
+        key = mykey,
+        type = "o",
+        pch = 1:length(country_subset),
+        col = col,
+        lwd = 2,
+        scales = list(x = list(at = seq(
+          0, max(test$days_since_case_ondeath, na.rm = TRUE), by = 5
+        )))
+      )
     print(xyp)
     
     # log(10) of confirmed cases vs days since reach 100 cases
-    xyp<-xyplot(confirmed ~ days_since_case_onset |  paste0(mytitle," - ","confirmed cases of COVID-19 since onset of sick person nr ",cases_minimum), 
-                groups = country,
-                data = subset(datx, days_since_case_onset >= 0 ), 
-                scales = list(y = list(log = 10),x = list(at = seq(0,max(datx$days_since_case_onset, na.rm = TRUE), by =5))),
-                xlab = paste0("Days since COVID-19 onset - confirmed case ",cases_minimum), ylab = "number of confirmed cases",
-                #key = mykey,
-                yscale.components = yscale.components.log10ticks,
-                type = "o", pch=1:length(country_subset),col=col,lwd = 2,
-                grid = TRUE,
-                panel = mypanel)
-    print(direct.label(xyp,"smart.grid"))
+    xyp <-
+      xyplot(
+        confirmed ~ days_since_case_onset |
+          paste0(
+            mytitle,
+            " - ",
+            "confirmed cases of COVID-19 since onset of sick person nr ",
+            cases_minimum
+          ),
+        groups = country,
+        data = subset(datx, days_since_case_onset >= 0),
+        scales = list(y = list(log = 10), x = list(at = seq(
+          0, max(datx$days_since_case_onset, na.rm = TRUE), by = 5
+        ))),
+        xlab = paste0("Days since COVID-19 onset - confirmed case ", cases_minimum),
+        ylab = "number of confirmed cases",
+        #key = mykey,
+        yscale.components = yscale.components.log10ticks,
+        type = "o",
+        pch = 1:length(country_subset),
+        col = col,
+        lwd = 2,
+        grid = TRUE,
+        panel = mypanel
+      )
+    print(direct.label(xyp, "smart.grid"))
     
     # log(10) of death cases vs days since reach 100 cases
-    xyp<-xyplot(death ~ days_since_case_ondeath |  paste0(mytitle," - ","dead cases of COVID-19 since dead of sick person nr ",cases_minimum), 
-                groups = country,
-                data = subset(datx, days_since_case_ondeath >= 0 ), 
-                xlab = paste0("Days since nr deaths was ",cases_minimum), ylab = "number of deaths",
-                scales = list(y = list(log = 10)),yscale.components = yscale.components.log10ticks,
-                #key = mykey,
-                type = "o", pch=1:length(country_subset),col=col,lwd = 2,
-                grid = TRUE,
-                panel = mypanel) 
-    print(direct.label(xyp,"smart.grid"))
+    xyp <-
+      xyplot(
+        death ~ days_since_case_ondeath |
+          paste0(
+            mytitle,
+            " - ",
+            "dead cases of COVID-19 since dead of sick person nr ",
+            cases_minimum
+          ),
+        groups = country,
+        data = subset(datx, days_since_case_ondeath >= 0),
+        xlab = paste0("Days since nr deaths was ", cases_minimum),
+        ylab = "number of deaths",
+        scales = list(y = list(log = 10)),
+        yscale.components = yscale.components.log10ticks,
+        #key = mykey,
+        type = "o",
+        pch = 1:length(country_subset),
+        col = col,
+        lwd = 2,
+        grid = TRUE,
+        panel = mypanel
+      )
+    print(direct.label(xyp, "smart.grid"))
     
     # log(10) of recovered cases vs days since reach 100 cases
-    xyp<-xyplot(recovered ~ days_since_case_onsafe |  paste0(mytitle," - ","recovered cases of COVID-19 since recovered of sick person nr ",cases_minimum), 
-                groups = country,
-                data = subset(datx, days_since_case_onsafe >= 0 ), 
-                xlab = paste0("Days since nr recovered case was ",cases_minimum), ylab = "number of recovered",
-                scales = list(y = list(log = 10)),yscale.components = yscale.components.log10ticks,
-                #key = mykey,
-                type = "o", pch=1:length(country_subset),col=col,lwd = 2,
-                grid = TRUE,
-                panel = mypanel) 
-    print(direct.label(xyp,"smart.grid"))
+    xyp <-
+      xyplot(
+        recovered ~ days_since_case_onsafe |
+          paste0(
+            mytitle,
+            " - ",
+            "recovered cases of COVID-19 since recovered of sick person nr ",
+            cases_minimum
+          ),
+        groups = country,
+        data = subset(datx, days_since_case_onsafe >= 0),
+        xlab = paste0("Days since nr recovered case was ", cases_minimum),
+        ylab = "number of recovered",
+        scales = list(y = list(log = 10)),
+        yscale.components = yscale.components.log10ticks,
+        #key = mykey,
+        type = "o",
+        pch = 1:length(country_subset),
+        col = col,
+        lwd = 2,
+        grid = TRUE,
+        panel = mypanel
+      )
+    print(direct.label(xyp, "smart.grid"))
     
     # log(10) of active cases vs days since reach 100 cases
-    xyp<-xyplot(active ~ days_since_case_on |  paste0(mytitle," - ","active cases of COVID-19 since nr active was ",cases_minimum), 
-                groups = country,
-                data = subset(datx, days_since_case_on >= 0 ), 
-                xlab = paste0("Days since nr active case was ",cases_minimum), ylab = "number of active cases",
-                scales = list(y = list(log = 10)),yscale.components = yscale.components.log10ticks,
-                key = mykey,
-                type = "o", pch=1:length(country_subset),col=col,lwd = 2,
-                grid = TRUE,
-                panel = mypanel)
-    print(direct.label(xyp,"smart.grid"))
+    xyp <-
+      xyplot(
+        active ~ days_since_case_on |
+          paste0(
+            mytitle,
+            " - ",
+            "active cases of COVID-19 since nr active was ",
+            cases_minimum
+          ),
+        groups = country,
+        data = subset(datx, days_since_case_on >= 0),
+        xlab = paste0("Days since nr active case was ", cases_minimum),
+        ylab = "number of active cases",
+        scales = list(y = list(log = 10)),
+        yscale.components = yscale.components.log10ticks,
+        key = mykey,
+        type = "o",
+        pch = 1:length(country_subset),
+        col = col,
+        lwd = 2,
+        grid = TRUE,
+        panel = mypanel
+      )
+    print(direct.label(xyp, "smart.grid"))
     
     
   }
   
+
+  
+  if (!useWorld) {
+    ### START ITALY PROJECTIONS ###
+    
+
+    set.seed(20192020)
+    
+    #pdf(file=sprintf("COVID-19 prophet %s.pdf", Sys.Date()),paper="a4r",width=14, height=14) # apro il device
+    
+    if (FALSE) {
+      datx <- covid19_italy_df
+      
+      test <- datx %>%
+        pivot_longer(
+          cols = c("confirmed", "active", "recovered", "death"),
+          names_to = "cases",
+          values_drop_na = TRUE
+        )
+      
+      ### trend analysis with Facebook Prophet
+      # https://facebook.github.io/prophet/
+      
+      for (casetype in c("confirmed", "active", "recovered", "death")) {
+        df <-
+          test %>% filter(cases == casetype &
+                            value > 100) %>% mutate(ds = date, y = log(value)) %>% select (ds, y) %>% arrange(ds)
+        #df <- covid19_italy_df %>% filter(active>0) %>% mutate(ds=date,y=log10(active)) %>% select (ds,y) %>% arrange(ds)
+        m <-
+          prophet(
+            df,
+            growth = "linear",
+            yearly.seasonality = FALSE,
+            weekly.seasonality = FALSE,
+            daily.seasonality = FALSE,
+            fit = FALSE,
+            changepoint_range = 0.98,
+            changepoint.prior.scale = 0.05,
+            interval.width = 0.95
+          )
+        m <- fit.prophet(m, df)
+        future <- make_future_dataframe(m, periods = 5)
+        forecast <- predict(m, future)
+        p <-
+          plot(m, forecast) + add_changepoints_to_plot(m) + ggtitle(casetype)
+        print(p)
+      }
+      
+    }
+    
+    if (TRUE) {
+      ### Fitting a simple SIR model with actual data in order to calculate R0
+      # https://blog.ephorie.de/epidemiology-how-contagious-is-novel-coronavirus-2019-ncov
+      
+      Infected <-
+        covid19_italy_df %>% filter(date > as.Date("2020-02-27")) %>% pull(confirmed)
+      Day <- 1:(length(Infected))
+      N <-
+        covid19_italy_df %>% filter (date == max(covid19_country_df$date, na.rm = TRUE) -
+                                       1) %>% pull(max(population, na.rm = TRUE)) # population
+      country <-
+        covid19_italy_df %>% filter (date == max(covid19_country_df$date, na.rm = TRUE) -
+                                       1) %>% pull(country)
+      
+      #old <- par(mfrow = c(1, 2))
+      #plot(Day, Infected, type ="b")
+      #plot(Day, Infected, log = "y")
+      #abline(lm(log10(Infected) ~ Day),col="red")
+      #title(sprintf("Total infections COVID-19 %s",country), outer = TRUE, line = -2)
+      
+      SIR <- function(time, state, parameters) {
+        par <- as.list(c(state, parameters))
+        with(par, {
+          dS <- -beta / N * I * S
+          dI <- beta / N * I * S - gamma * I
+          dR <- gamma * I
+          list(c(dS, dI, dR))
+        })
+      }
+      
+      init <- c(S = N - Infected[1],
+                I = Infected[1],
+                R = 0)
+      RSS <- function(parameters) {
+        names(parameters) <- c("beta", "gamma")
+        out <-
+          ode(
+            y = init,
+            times = Day,
+            func = SIR,
+            parms = parameters
+          )
+        fit <- out[, 3]
+        sum((Infected - fit) ^ 2)
+      }
+      
+      Opt <-
+        optim(
+          c(0.5, 0.5),
+          RSS,
+          method = "L-BFGS-B",
+          lower = c(0, 0),
+          upper = c(1, 1)
+        ) # optimize with some sensible conditions
+      Opt$message
+      ## [1] "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
+      
+      Opt_par <- setNames(Opt$par, c("beta", "gamma"))
+      Opt_par
+      ##      beta     gamma
+      ## 0.6427585 0.3572415
+      
+      t <- 1:120 # time in days
+      fit <-
+        data.frame(ode(
+          y = init,
+          times = t,
+          func = SIR,
+          parms = Opt_par
+        ))
+      col <- 1:3 # colour
+      
+      #matplot(fit$time, fit[ , 2:4], type = "l", xlab = "Day", ylab = "Number of subjects", lwd = 2, lty = 1, col = col)
+      #matplot(fit$time, fit[ , 2:4], type = "l", xlab = "Day", ylab = "Number of subjects", lwd = 2, lty = 1, col = col, log = "y")
+      
+      ## Warning in xy.coords(x, y, xlabel, ylabel, log = log): 1 y value <= 0
+      ## omitted from logarithmic plot
+      
+      #points(Day, Infected)
+      #legend("bottomright", c("Susceptibles", "Infecteds", "Recovereds"), lty = 1, lwd = 2, col = col, inset = 0.05)
+      #title(sprintf("SIR model COVID-19  %s",country), outer = TRUE, line = -2)
+      
+      
+      #par(old)
+      
+      R0 <- setNames(Opt_par["beta"] / Opt_par["gamma"], "R0")
+      R0
+      ##       R0
+      ## 1.799227
+      
+      fit[fit$I == max(fit$I, na.rm = TRUE), "I", drop = FALSE] # height of pandemic
+      ##          I
+      ## 54 9765121
+      
+      max_infected <- max(fit$I, na.rm = TRUE)
+      max_infected / 5 # severe cases
+      ## [1] 1953024
+      
+      max_infected * 0.06 # cases with need for intensive care
+      ## [1] 585907.3
+      
+      # https://www.newscientist.com/article/mg24532733-700-why-is-it-so-hard-to-calculate-how-many-people-will-die-from-covid-19/
+      max_infected * 0.007 # deaths with supposed 0.7% fatality rate
+      ## [1] 68355.85
+      
+      
+      
+      ###
+      
+      ### herd_immunity scenario
+      # data fitted until 8 March 2020, before national lockdown, because in this scenario we try to predict what happened if no lockdown would be declared.
+      StartDay <-  min(covid19_italy_df$date)
+      NI_before_ld <-
+        covid19_italy_df %>% filter(date >= StartDay &
+                                      date <= as.Date("2020/03/08")) %>% pull(confirmed) #infected
+      RI_before_ld <-
+        covid19_italy_df %>% filter(date >= StartDay &
+                                      date <= as.Date("2020/03/08")) %>% mutate(R = death + recovered) %>% pull(R) #recovered (including death)
+      N <-
+        covid19_italy_df %>% filter (date == max(covid19_country_df$date, na.rm = TRUE) -
+                                       1) %>% pull(max(population, na.rm = TRUE)) # population
+      death_in_R <-
+        covid19_italy_df %>% filter(date == max(covid19_country_df$date, na.rm = TRUE) -
+                                      1) %>% mutate(DR = death / (death + recovered)) %>% pull(DR) #death rate
+      beta0 <- Opt_par["beta"]
+      gamma0 <- Opt_par["gamma"]
+      
+      Day <- 1:(length(NI_before_ld))
+      
+      EndDay <- StartDay + tail(Day, n = 1) - 1
+      
+      country <-
+        covid19_italy_df %>% filter (date == max(covid19_country_df$date, na.rm = TRUE) -
+                                       1) %>% pull(country)
+      
+      
+      R <- RI_before_ld / N
+      Y <- NI_before_ld / N - R
+      
+      
+      # ### without pi(t), the standard state-space SIR model without intervention
+      # res.no_lockdown <- tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
+      #                       casename=sprintf("%s_no_lockdown",country),
+      #                      save_files = F, save_mcmc=F,save_plot_data = T,add_death =T,
+      #                       M=5e3,nburnin = 2e3)
+      # print(res.no_lockdown$plot_infection)
+      # print(res.no_lockdown$plot_removed)
+      
+      ### a SIR model with a time-varying transmission rate - Step function of pi(t)
+      change_time <- c("02/21/2020")
+      pi0 <- c(1.0, 0.9)
+      res.herd_immunity <-
+        tvt.eSIR(
+          Y,
+          R,
+          begin_str = format(StartDay, "%m/%d/%Y"),
+          death_in_R = death_in_R,
+          beta0 = beta0,
+          gamma0 = gamma0,
+          T_fin = 160,
+          pi0 = pi0,
+          change_time = change_time,
+          dic = T,
+          casename = sprintf("%s_herd_immunity", country),
+          save_files = T,
+          save_mcmc = T,
+          save_plot_data = T,
+          add_death = T,
+          M = 5e3,
+          nburnin = 2e3
+        )
+      
+      
+      
+      ### actual scenarios: lockdown with no reopen, early reopen and late reopen
+      # data fitted until now because our SIR model with a time-varying transmission rate tries to model the changes in transmission due to national lockdown
+      
+      
+      NI_complete <-
+        covid19_italy_df %>% filter(date >= StartDay) %>% pull(confirmed) #infected
+      RI_complete <-
+        covid19_italy_df %>% filter(date >= StartDay) %>% mutate(R = death + recovered) %>% pull(R) #recovered (including death)
+      N <-
+        covid19_italy_df %>% filter (date == max(covid19_country_df$date, na.rm = TRUE) -
+                                       1) %>% pull(max(population, na.rm = TRUE)) # population
+      death_in_R <-
+        covid19_italy_df %>% filter(date == max(covid19_country_df$date, na.rm = TRUE) -
+                                      1) %>% mutate(DR = death / (death + recovered)) %>% pull(DR) #death rate
+      beta0 <- Opt_par["beta"]
+      gamma0 <- Opt_par["gamma"]
+      
+      Day <- 1:(length(NI_complete))
+      
+      EndDay <- StartDay + tail(Day, n = 1) - 1
+      
+      country <-
+        covid19_italy_df %>% filter (date == max(covid19_country_df$date, na.rm = TRUE) -
+                                       1) %>% pull(country)
+      
+      
+      R <- RI_complete / N
+      Y <- NI_complete / N - R
+      
+      
+      ### scenario with lockdoown and no reopen
+      
+      change_time <-
+        c("02/21/2020", "03/08/2020", "03/10/2020", "03/21/2020")
+      pi0 <- c(1.0, 0.9, 0.4, 0.2, 0.15)
+      
+      # pi_t <- data.frame(
+      #     x = as.Date(c("01/31/2020","02/21/2020","03/08/2020","03/10/2020","03/21/2020","04/13/2020"),"%m/%d/%Y",origin="2020-01-31"),
+      #     y =c(1.0,0.9,0.4,0.2,0.15,0.15))
+      # ggplot(pi_t, aes(x,y)) + geom_step() #Ploting the pi_t step function
+      
+      res.lockdown <-
+        tvt.eSIR(
+          Y,
+          R,
+          begin_str = format(StartDay, "%m/%d/%Y"),
+          death_in_R = death_in_R,
+          beta0 = beta0,
+          gamma0 = gamma0,
+          T_fin = 160,
+          pi0 = pi0,
+          change_time = change_time,
+          dic = T,
+          casename = sprintf("%s_lockdown", country),
+          save_files = T,
+          save_mcmc = T,
+          save_plot_data = T,
+          add_death = T,
+          M = 5e3,
+          nburnin = 2e3
+        )
+      
+      
+      ### scenario with lockdown and an early reopen after Easter, with a gradual return to usual routine until 2nd of June
+      
+      change_time <-
+        c(
+          "02/21/2020",
+          "03/08/2020",
+          "03/10/2020",
+          "03/21/2020",
+          "04/14/2020",
+          "05/08/2020",
+          "06/03/2020"
+        )
+      pi0 <- c(1.0, 0.9, 0.4, 0.2, 0.15, 0.4, 0.6, 1.0)
+      res.after_easter_reopen <-
+        tvt.eSIR(
+          Y,
+          R,
+          begin_str = format(StartDay, "%m/%d/%Y"),
+          death_in_R = death_in_R,
+          beta0 = beta0,
+          gamma0 = gamma0,
+          T_fin = 160,
+          pi0 = pi0,
+          change_time = change_time,
+          dic = T,
+          casename = sprintf("%safter_easter_reopen", country),
+          save_files = T,
+          save_mcmc = T,
+          save_plot_data = T,
+          add_death = T,
+          M = 5e3,
+          nburnin = 2e3
+        )
+      
+      
+      ### scenario with lockdown and an late reopen after first of May weekend, with a gradual return to usual routine until 2nd of June
+      
+      change_time <-
+        c(
+          "02/21/2020",
+          "03/08/2020",
+          "03/10/2020",
+          "03/21/2020",
+          "05/08/2020",
+          "06/03/2020"
+        )
+      pi0 <- c(1.0, 0.9, 0.4, 0.2, 0.15, 0.5, 1.0)
+      res.after_1_may_reopen <-
+        tvt.eSIR(
+          Y,
+          R,
+          begin_str = format(StartDay, "%m/%d/%Y"),
+          death_in_R = death_in_R,
+          beta0 = beta0,
+          gamma0 = gamma0,
+          T_fin = 160,
+          pi0 = pi0,
+          change_time = change_time,
+          dic = T,
+          casename = sprintf("%sstep_after_1_may_reopen", country),
+          save_files = T,
+          save_mcmc = T,
+          save_plot_data = T,
+          add_death = T,
+          M = 5e3,
+          nburnin = 2e3
+        )
+      
+      
+      
+      ### scenario with lockdown and a slow reopen after first of May weekend, with a gradual return to usual routine until 2nd of June
+      
+      change_time <-
+        c(
+          "02/21/2020",
+          "03/08/2020",
+          "03/10/2020",
+          "03/21/2020",
+          "05/08/2020",
+          "05/18/2020",
+          "06/03/2020"
+        )
+      pi0 <- c(1.0, 0.9, 0.4, 0.2, 0.15, 0.2, 0.5, 1.0)
+      res.after_1_may_and_18_reopen <-
+        tvt.eSIR(
+          Y,
+          R,
+          begin_str = format(StartDay, "%m/%d/%Y"),
+          death_in_R = death_in_R,
+          beta0 = beta0,
+          gamma0 = gamma0,
+          T_fin = 160,
+          pi0 = pi0,
+          change_time = change_time,
+          dic = T,
+          casename = sprintf("%s_after_1_may_and_18_reopen", country),
+          save_files = T,
+          save_mcmc = T,
+          save_plot_data = T,
+          add_death = T,
+          M = 5e3,
+          nburnin = 2e3
+        )
+      
+      
+      
+      
+      ### scenario with lockdown and an late  and immediate reopen after 2nd of June
+      
+      change_time <-
+        c("02/21/2020",
+          "03/08/2020",
+          "03/10/2020",
+          "03/21/2020",
+          "06/03/2020")
+      pi0 <- c(1.0, 0.9, 0.4, 0.2, 0.15, 1.0)
+      res.after_2_june_reopen <-
+        tvt.eSIR(
+          Y,
+          R,
+          begin_str = format(StartDay, "%m/%d/%Y"),
+          death_in_R = death_in_R,
+          beta0 = beta0,
+          gamma0 = gamma0,
+          T_fin = 160,
+          pi0 = pi0,
+          change_time = change_time,
+          dic = T,
+          casename = sprintf("%safter_2_june_reopen", country),
+          save_files = T,
+          save_mcmc = T,
+          save_plot_data = T,
+          add_death = T,
+          M = 5e3,
+          nburnin = 2e3
+        )
+      
+      
+      # ### SIR with time-varying quarantine, which follows a Dirac Delta function rho(t)
+      # change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020")
+      # phi0<- c(0.05,0.25,0.4,0.2)
+      # res.q <- qh.eSIR (Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=150,
+      #                   phi0=phi0,change_time=change_time,casename=sprintf("%s_q",country),
+      #                   save_files = F,save_mcmc = F,save_plot_data = F,
+      #                   M=5e3,nburnin = 2e3)
+      #
+      # print(res.q$plot_infection)
+      # print(res.q$plot_removed)
+      ###
+      
+      print(res.herd_immunity$plot_infection)
+      print(res.lockdown$plot_infection)
+      print(res.after_easter_reopen$plot_infection)
+      print(res.after_1_may_reopen$plot_infection)
+      print(res.after_1_may_and_18_reopen$plot_infection)
+      print(res.after_2_june_reopen$plot_infection)
+      
+      
+      print(res.herd_immunity$plot_removed)
+      print(res.lockdown$plot_removed)
+      print(res.after_easter_reopen$plot_removed)
+      print(res.after_1_may_reopen$plot_removed)
+      print(res.after_1_may_and_18_reopen$plot_removed)
+      print(res.after_2_june_reopen$plot_removed)
+    }
+    ### end italy
+    #
+  }
   dev.off() # lo chiudo
 }
-
-
-
-
-### START ITALY PROJECTIONS ###
-
-library(prophet)
-library(ggplot2)
-
-library(deSolve)
-
-### https://github.com/lilywang1988/eSIR
-#library(devtools)
-#install_github("lilywang1988/eSIR")
-library(eSIR) 
-
-set.seed(20192020)
-
-pdf(file=sprintf("COVID-19 prophet %s.pdf", Sys.Date()),paper="a4r",width=14, height=14) # apro il device
-
-if(TRUE) {
-  
-  datx <- covid19_italy_df
-  
-  test <- datx %>%
-    pivot_longer(
-      cols = c("confirmed","active","recovered","death"),
-      names_to = "cases",
-      values_drop_na = TRUE
-    )
-  
-  ### trend analysis with Facebook Prophet
-  # https://facebook.github.io/prophet/
-  
-  for (casetype in c("confirmed","active","recovered","death")) {
-    
-    df <- test %>% filter(cases==casetype & value>100) %>% mutate(ds=date,y=log(value)) %>% select (ds,y) %>% arrange(ds)
-    #df <- covid19_italy_df %>% filter(active>0) %>% mutate(ds=date,y=log10(active)) %>% select (ds,y) %>% arrange(ds)
-    m <- prophet(df,growth = "linear",yearly.seasonality = FALSE, weekly.seasonality = FALSE, daily.seasonality = FALSE,fit=FALSE,
-                 changepoint_range=0.98,
-                 changepoint.prior.scale = 0.05,
-                 interval.width = 0.95)
-    m <-fit.prophet(m, df)
-    future <- make_future_dataframe(m, periods= 5)
-    forecast <- predict(m, future)
-    p <- plot(m, forecast) + add_changepoints_to_plot(m) + ggtitle(casetype)
-    print(p)
-  }
-  
-  
-  
-  ### Fitting a simple SIR model with actual data in order to calculate R0
-  # https://blog.ephorie.de/epidemiology-how-contagious-is-novel-coronavirus-2019-ncov
-  
-  Infected <- covid19_italy_df %>% filter(date > as.Date("2020-02-27")) %>% pull(confirmed)
-  Day <- 1:(length(Infected))
-  N <- covid19_italy_df %>% filter (date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% pull(max(population, na.rm = TRUE)) # population 
-  country <- covid19_italy_df %>% filter (date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% pull(country)
-  
-  old <- par(mfrow = c(1, 2))
-  plot(Day, Infected, type ="b")
-  plot(Day, Infected, log = "y")
-  abline(lm(log10(Infected) ~ Day),col="red")
-  title(sprintf("Total infections COVID-19 %s",country), outer = TRUE, line = -2)
-  
-  SIR <- function(time, state, parameters) {
-    par <- as.list(c(state, parameters))
-    with(par, {
-      dS <- -beta/N * I * S
-      dI <- beta/N * I * S - gamma * I
-      dR <- gamma * I
-      list(c(dS, dI, dR))
-    })
-  }
-  
-  init <- c(S = N-Infected[1], I = Infected[1], R = 0)
-  RSS <- function(parameters) {
-    names(parameters) <- c("beta", "gamma")
-    out <- ode(y = init, times = Day, func = SIR, parms = parameters)
-    fit <- out[ , 3]
-    sum((Infected - fit)^2)
-  }
-  
-  Opt <- optim(c(0.5, 0.5), RSS, method = "L-BFGS-B", lower = c(0, 0), upper = c(1, 1)) # optimize with some sensible conditions
-  Opt$message
-  ## [1] "CONVERGENCE: REL_REDUCTION_OF_F <= FACTR*EPSMCH"
-  
-  Opt_par <- setNames(Opt$par, c("beta", "gamma"))
-  Opt_par
-  ##      beta     gamma 
-  ## 0.6427585 0.3572415
-  
-  t <- 1:120 # time in days
-  fit <- data.frame(ode(y = init, times = t, func = SIR, parms = Opt_par))
-  col <- 1:3 # colour
-  
-  matplot(fit$time, fit[ , 2:4], type = "l", xlab = "Day", ylab = "Number of subjects", lwd = 2, lty = 1, col = col)
-  matplot(fit$time, fit[ , 2:4], type = "l", xlab = "Day", ylab = "Number of subjects", lwd = 2, lty = 1, col = col, log = "y")
-  ## Warning in xy.coords(x, y, xlabel, ylabel, log = log): 1 y value <= 0
-  ## omitted from logarithmic plot
-  
-  points(Day, Infected)
-  legend("bottomright", c("Susceptibles", "Infecteds", "Recovereds"), lty = 1, lwd = 2, col = col, inset = 0.05)
-  title(sprintf("SIR model COVID-19  %s",country), outer = TRUE, line = -2)
-  
-  
-  par(old)
-  
-  R0 <- setNames(Opt_par["beta"] / Opt_par["gamma"], "R0")
-  R0
-  ##       R0 
-  ## 1.799227
-  
-  fit[fit$I == max(fit$I, na.rm = TRUE), "I", drop = FALSE] # height of pandemic
-  ##          I
-  ## 54 9765121
-  
-  max_infected <- max(fit$I, na.rm = TRUE)
-  max_infected / 5 # severe cases
-  ## [1] 1953024
-  
-  max_infected * 0.06 # cases with need for intensive care
-  ## [1] 585907.3
-  
-  # https://www.newscientist.com/article/mg24532733-700-why-is-it-so-hard-to-calculate-how-many-people-will-die-from-covid-19/
-  max_infected * 0.007 # deaths with supposed 0.7% fatality rate
-  ## [1] 68355.85
-  
-  
-  
-  ###
-  
-  ### herd_immunity scenario
-  # data fitted until 8 March 2020, before national lockdown, because in this scenario we try to predict what happened if no lockdown would be declared.
-  StartDay <-  min(covid19_italy_df$date)
-  NI_before_ld <- covid19_italy_df %>% filter(date >= StartDay & date <=as.Date("2020/03/08")) %>% pull(confirmed) #infected
-  RI_before_ld <- covid19_italy_df %>% filter(date >= StartDay & date <=as.Date("2020/03/08")) %>% mutate(R=death+recovered) %>% pull(R) #recovered (including death)
-  N <- covid19_italy_df %>% filter (date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% pull(max(population, na.rm = TRUE)) # population 
-  death_in_R <- covid19_italy_df %>% filter(date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% mutate(DR=death/(death+recovered)) %>% pull(DR) #death rate
-  beta0 <- Opt_par["beta"]
-  gamma0 <- Opt_par["gamma"]
-  
-  Day <- 1:(length(NI_before_ld))
-  
-  EndDay <- StartDay+tail(Day, n=1)-1
-  
-  country <- covid19_italy_df %>% filter (date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% pull(country)
-  
-  
-  R <- RI_before_ld/N
-  Y <- NI_before_ld/N- R 
-  
-  
-  # ### without pi(t), the standard state-space SIR model without intervention
-  # res.no_lockdown <- tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
-  #                       casename=sprintf("%s_no_lockdown",country),
-  #                      save_files = F, save_mcmc=F,save_plot_data = T,add_death =T,
-  #                       M=5e3,nburnin = 2e3)
-  # print(res.no_lockdown$plot_infection)
-  # print(res.no_lockdown$plot_removed)
-   
-  ### a SIR model with a time-varying transmission rate - Step function of pi(t)
-  change_time <- c("02/21/2020")
-  pi0<- c(1.0,0.9)
-  res.herd_immunity <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
-                          pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%s_herd_immunity",country),
-                          save_files = T, save_mcmc=T,save_plot_data = T,add_death =T,
-                          M=5e3,nburnin = 2e3)
-  print(res.herd_immunity$plot_infection)
-  print(res.herd_immunity$plot_removed)
-  
-  
-  ### actual scenarios: lockdown with no reopen, early reopen and late reopen
-  # data fitted until now because our SIR model with a time-varying transmission rate tries to model the changes in transmission due to national lockdown
-  
-
-  NI_complete <- covid19_italy_df %>% filter(date >= StartDay) %>% pull(confirmed) #infected
-  RI_complete <- covid19_italy_df %>% filter(date >= StartDay) %>% mutate(R=death+recovered) %>% pull(R) #recovered (including death)
-  N <- covid19_italy_df %>% filter (date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% pull(max(population, na.rm = TRUE)) # population 
-  death_in_R <- covid19_italy_df %>% filter(date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% mutate(DR=death/(death+recovered)) %>% pull(DR) #death rate
-  beta0 <- Opt_par["beta"]
-  gamma0 <- Opt_par["gamma"]
-  
-  Day <- 1:(length(NI_complete))
-  
-  EndDay <- StartDay+tail(Day, n=1)-1
-  
-  country <- covid19_italy_df %>% filter (date==max(covid19_country_df$date, na.rm = TRUE)-1) %>% pull(country)
-  
-  
-  R <- RI_complete/N
-  Y <- NI_complete/N- R 
-  
-  
-  ### scenario with lockdoown and no reopen
-  
-  change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020")
-  pi0<- c(1.0,0.9,0.4,0.2,0.15)
-
-  # pi_t <- data.frame(
-  #     x = as.Date(c("01/31/2020","02/21/2020","03/08/2020","03/10/2020","03/21/2020","04/13/2020"),"%m/%d/%Y",origin="2020-01-31"),
-  #     y =c(1.0,0.9,0.4,0.2,0.15,0.15))
-  # ggplot(pi_t, aes(x,y)) + geom_step() #Ploting the pi_t step function
-  
-  res.lockdown <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
-                      pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%s_lockdown",country),
-                      save_files = T, save_mcmc=T,save_plot_data = T,add_death =T,
-                      M=5e3,nburnin = 2e3)
-  print(res.lockdown$plot_infection)
-  print(res.lockdown$plot_removed)
-  
-  ### scenario with lockdown and an early reopen after Easter, with a gradual return to usual routine until 2nd of June
-  
-  change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020","04/14/2020","05/08/2020","06/03/2020")
-  pi0<- c(1.0,0.9,0.4,0.2,0.15,0.4,0.6,1.0)
-  res.after_easter_reopen <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
-                      pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%safter_easter_reopen",country),
-                      save_files = T, save_mcmc=T,save_plot_data = T,add_death =T,
-                      M=5e3,nburnin = 2e3)
-  print(res.after_easter_reopen$plot_infection)
-  print(res.after_easter_reopen$plot_removed)
-  
-  ### scenario with lockdown and an late reopen after first of May weekend, with a gradual return to usual routine until 2nd of June
-  
-  change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020","05/08/2020","06/03/2020")
-  pi0<- c(1.0,0.9,0.4,0.2,0.15,0.5,1.0)
-  res.after_1_may_reopen <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
-                             pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%sstep_after_1_may_reopen",country),
-                             save_files = T, save_mcmc=T,save_plot_data = T,add_death =T,
-                             M=5e3,nburnin = 2e3)
-  print(res.after_1_may_reopen$plot_infection)
-  print(res.after_1_may_reopen$plot_removed)
-  
-  
-  ### scenario with lockdown and a slow reopen after first of May weekend, with a gradual return to usual routine until 2nd of June
-  
-  change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020","05/08/2020","05/18/2020","06/03/2020")
-  pi0<- c(1.0,0.9,0.4,0.2,0.15,0.2,0.5,1.0)
-  res.after_1_may_and_18_reopen <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
-                                    pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%s_after_1_may_and_18_reopen",country),
-                                    save_files = T, save_mcmc=T,save_plot_data = T,add_death =T,
-                                    M=5e3,nburnin = 2e3)
-  print(res.after_1_may_and_18_reopen$plot_infection)
-  print(res.after_1_may_and_18_reopen$plot_removed)
-  
-  
-  
-  ### scenario with lockdown and an late  and immediate reopen after 2nd of June
-  
-  change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020","06/03/2020")
-  pi0<- c(1.0,0.9,0.4,0.2,0.15,1.0)
-  res.after_2_june_reopen <-tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=160,
-                                    pi0=pi0,change_time=change_time,dic=T,casename=sprintf("%safter_2_june_reopen",country),
-                                    save_files = T, save_mcmc=T,save_plot_data = T,add_death =T,
-                                    M=5e3,nburnin = 2e3)
-  print(res.after_2_june_reopen$plot_infection)
-  print(res.after_2_june_reopen$plot_removed)
-  
-  # ### SIR with time-varying quarantine, which follows a Dirac Delta function rho(t)
-  # change_time <- c("02/21/2020","03/08/2020","03/10/2020","03/21/2020")
-  # phi0<- c(0.05,0.25,0.4,0.2)
-  # res.q <- qh.eSIR (Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=150,
-  #                   phi0=phi0,change_time=change_time,casename=sprintf("%s_q",country),
-  #                   save_files = F,save_mcmc = F,save_plot_data = F,
-  #                   M=5e3,nburnin = 2e3)
-  # 
-  # print(res.q$plot_infection)
-  # print(res.q$plot_removed) 
-  ### 
-
-
-}
-### end italy 
-dev.off() # lo chiudo
-#
-
 
 
 
