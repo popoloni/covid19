@@ -19,6 +19,9 @@ library(deSolve)
 #install_github("lilywang1988/eSIR")
 library(eSIR)
 
+##
+useWorld <- TRUE
+##
 
 setwd("D:/OneDrive/data/covid19/data")
 
@@ -312,8 +315,8 @@ write.csv(covid19_italy_df,sprintf("covid19_italy_df_%s.csv", Sys.Date()), row.n
 write.csv(covid19_country_df %>% distinct(country) %>% arrange(country),sprintf("countries_%s.csv", Sys.Date()), row.names = FALSE)
 
 
-##
-for (useWorld in c(TRUE, FALSE)) {
+#for (useWorld in c(TRUE, FALSE)) {
+if(TRUE){
   if (!useWorld) {
     BIGlabel = "ITALY "
   } else {
