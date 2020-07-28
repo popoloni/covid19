@@ -15,6 +15,13 @@ library(zoo)
 library(deSolve)
 library(viridis)
 library(hrbrthemes)
+library(scales)
+
+library(showtext)
+showtext_auto()
+library(myriad)
+import_myriad_semi()
+
 
 ### https://github.com/lilywang1988/eSIR
 #library(devtools)
@@ -22,8 +29,10 @@ library(hrbrthemes)
 library(eSIR)
 
 ##
-## useWorld <- FALSE
+## useWorld <- TRUE
 ##
+
+reportList <- c(TRUE,FALSE)
 
 setwd("D:/OneDrive/data/covid19/data")
 
@@ -109,6 +118,7 @@ cname_table <- cname_table %>%
 
 lw <- list()
 li <- list()
+la <- list()
 
 data_csv <- ""
 data_file<-NULL
@@ -224,9 +234,12 @@ for (data_iter in seq(as.Date("2020-1-22"), Sys.Date(), by = "days")) {
   
   lw <- list.append(lw,subset(data_daily, !(country %in% c("Italy"))))
   
+  la <- list.append(la,data_daily)
+  
 }
 
 
+if(TRUE) {
 print(paste0("reading ","dpc-covid19-ita-regioni.csv"))
 
 
@@ -252,6 +265,9 @@ data_ita_w <- rbindlist(li, fill = TRUE)
 lw <- list.append(lw,subset(data_ita_w,date < min(data_ita$date)))
 
 lw <- list.append(lw,data_ita)
+} else  {
+  lw <- la
+}
 
 covid19_raw_df <- rbindlist(lw, fill = TRUE)
 
@@ -286,21 +302,21 @@ names(pop_data_ita) <- c("region","population")
 pop_data_ita$country <- "Italy"
 
 # add population
-covid19_raw_df <- covid19_raw_df %>% 
+covid19_raw_df2 <- covid19_raw_df %>% 
   left_join(select(cname_table,country,iso3), by = c("country")) %>% 
-  left_join(select(pop_data,iso3c,value), by = c("iso3"="iso3c")) %>% rename(population=value)
+  left_join(select(pop_data %>% filter(date==2019),iso3c,value), by = c("iso3"="iso3c")) %>% rename(population=value)
 
-covid19_raw_df <- covid19_raw_df %>%   
+covid19_raw_df2 <- covid19_raw_df2 %>%   
   mutate(population = case_when(country=="Italy"~ NA_real_, TRUE  ~ population)) 
 
-covid19_raw_df <- covid19_raw_df %>% 
+covid19_raw_df2 <- covid19_raw_df2 %>% 
   full_join(select(pop_data_ita,country,region,population), by = c("region", "country"))%>% 
   group_by(date,country,region,confirmed,death,recovered,iso3) %>%
   mutate(population=case_when(country=="Italy"~ population.y, TRUE  ~ population.x)) %>% select (-c("population.x","population.y","iso3"))
 
 
 
-covid19_country_df <-  covid19_raw_df %>% filter(region != "Ship") %>%
+covid19_country_df <-  covid19_raw_df2 %>% filter(region != "Ship") %>%
   group_by(date, country) %>%
   summarise(confirmed = sum(confirmed, na.rm = TRUE), death = sum(death, na.rm = TRUE), recovered = sum(recovered, na.rm = TRUE), population = max(population, na.rm = TRUE)) %>%
   mutate(active = confirmed - death-recovered) %>%
@@ -318,7 +334,10 @@ write.csv(covid19_country_df %>% distinct(country) %>% arrange(country),sprintf(
 
 
 
-for(useWorld in c(TRUE,FALSE)){
+for(useWorld in reportList){
+  
+  #useWorld <- FALSE #debug
+  
   if (!useWorld) {
     BIGlabel = "ITALY "
   } else {
@@ -396,8 +415,11 @@ for(useWorld in c(TRUE,FALSE)){
       temp <-
         covid19_raw_df %>% filter(date == max(covid19_country_df$date) - 1 &
                                     country == "Italy") %>% arrange (desc(confirmed)) %>% ungroup()
-      i <- sapply(temp, is.factor)
-      temp[i] <- lapply(temp[i], as.character)
+      #i <- sapply(temp, is.factor)
+      #temp[i] <- lapply(temp[i], as.character)
+      
+      for(i in which(sapply(temp, class) == "factor")) temp[[i]] = as.character(temp[[i]])
+      
       region_subset <-
         sort(temp %>% top_n(ntop, confirmed) %>% pull(region))
       current_dataset <-
@@ -410,8 +432,11 @@ for(useWorld in c(TRUE,FALSE)){
         arrange(date, country)
       country_subset <-
         region_subset #sort(levels(region_subset)[as.integer(region_subset)])
-      i <- sapply(current_dataset, is.factor)
-      current_dataset[i] <- lapply(current_dataset[i], as.character)
+      
+      #i <- sapply(current_dataset, is.factor)
+      #current_dataset[i] <- lapply(current_dataset[i], as.character)
+      for(i in which(sapply(current_dataset, class) == "factor")) current_dataset[[i]] = as.character(current_dataset[[i]])
+      
       if (!useBIG) {
         col <- brewer.pal(length(country_subset), "Set3")
       } else {
@@ -530,7 +555,8 @@ for(useWorld in c(TRUE,FALSE)){
             levels = factor_levels
           ),
           data = current_dataset,
-          type = c("o"),
+          type = c("l"),
+          lwd = 1,
           scales = list(
             y = list(relation = "free", rot = 0),
             x = list(rot = 45, format = "%Y-%m-%d")
@@ -582,7 +608,8 @@ for(useWorld in c(TRUE,FALSE)){
             levels = factor_levels
           ),
           data = current_dataset,
-          type = c("o"),
+          type = c("l"),
+          lwd = 1,
           scales = list(
             y = list(relation = "free", rot = 0),
             x = list(rot = 45, format = "%Y-%m-%d")
@@ -716,6 +743,7 @@ for(useWorld in c(TRUE,FALSE)){
     print(xyp)
     
     # log(10) of newly confirmed cases vs days
+
     xyp <-
       xyplot(
         newly_confirmed ~ date |
@@ -734,8 +762,8 @@ for(useWorld in c(TRUE,FALSE)){
           )
         ),
         key = mykey,
-        #type = c("p", "smooth"),
-        type = "o",
+        type = c(ifelse( useBIG, "smooth", "o")),
+        #type = "o",
         pch = 1:length(country_subset),
         col = col,
         lwd = 2,
@@ -1229,7 +1257,7 @@ for(useWorld in c(TRUE,FALSE)){
       death_in_R <-
         covid19_italy_df %>% filter(date == max(covid19_country_df$date, na.rm = TRUE) -
                                       1) %>% mutate(DR = death / (death + recovered)) %>% pull(DR) #death rate
-      beta0 <- Opt_par["beta"]
+      beta0  <- Opt_par["beta"]
       gamma0 <- Opt_par["gamma"]
       
       Day <- 1:(length(NI_complete))
@@ -1247,41 +1275,47 @@ for(useWorld in c(TRUE,FALSE)){
       
       ### scenario with lockdoown and no reopen
       
-      change_time <-
-        c("02/21/2020", "03/08/2020", "03/10/2020", "03/21/2020", "04/14/2020")
-      pi0 <- c(1.0, 0.9, 0.4, 0.2, 0.15, 0.2)
-      
-      
-      
-      pi_t <- data.frame(
-           x = as.Date(append(change_time,"02/15/2020",after=0),"%m/%d/%Y",origin="2020-02-15"),
-           y = pi0)
-      pit_plot.lockdown <- ggplot(pi_t, aes(x,y)) + geom_step() +labs(x = "Days", 
-                                                 y = expression(pi*(t)), 
-                                                 title = "Trasmission rate over time", 
-                                                 subtitle = "fully lock down scenario", 
-                                                 caption = "Enrico Papalini @popoloni") #Ploting the pi_t step function
-      
-      res.lockdown <-
-        tvt.eSIR(
-          Y,
-          R,
-          begin_str = format(StartDay, "%m/%d/%Y"),
-          death_in_R = death_in_R,
-          beta0 = beta0,
-          gamma0 = gamma0,
-          T_fin = 160,
-          pi0 = pi0,
-          change_time = change_time,
-          dic = T,
-          casename = sprintf("%s_lockdown", country),
-          save_files = T,
-          save_mcmc = T,
-          save_plot_data = T,
-          add_death = T,
-          M = 5e3,
-          nburnin = 2e3
-        )
+      # change_time <-
+      #   c("02/21/2020",
+      #     "03/08/2020",
+      #     "03/10/2020",
+      #     "03/21/2020")
+      # 
+      # pi0 <- c(1.0, 0.8, 0.3, 0.2, 0.10)
+      # 
+      # pi_t <- data.frame(
+      #      x = as.Date(append(change_time,"02/15/2020",after=0),"%m/%d/%Y",origin="2020-02-15"),
+      #      y = pi0)
+      # pit_plot.lockdown <- ggplot(pi_t, aes(x,y)) + 
+      #   scale_x_date(date_breaks = "weeks") + 
+      #   scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+      #   geom_step() +labs(x = "Days", 
+      #                     y = expression(pi*(t)), 
+      #                     title = "Trasmission rate over time", 
+      #                     subtitle = "lockdown until 4th May", 
+      #                     caption = "Enrico Papalini @popoloni") + 
+      #   theme_ipsum() #Ploting the pi_t step function
+      # 
+      # res.lockdown <-
+      #   tvt.eSIR(
+      #     Y,
+      #     R,
+      #     begin_str = format(StartDay, "%m/%d/%Y"),
+      #     death_in_R = death_in_R,
+      #     beta0 = beta0,
+      #     gamma0 = gamma0,
+      #     T_fin = 160,
+      #     pi0 = pi0,
+      #     change_time = change_time,
+      #     dic = T,
+      #     casename = sprintf("%s_lockdown", country),
+      #     save_files = T,
+      #     save_mcmc = T,
+      #     save_plot_data = T,
+      #     add_death = T,
+      #     M = 5e3,
+      #     nburnin = 2e3
+      #   )
       
       
       # ### scenario with lockdown and an early reopen after Easter, with a gradual return to usual routine until 2nd of June
@@ -1362,87 +1396,96 @@ for(useWorld in c(TRUE,FALSE)){
           "03/08/2020",
           "03/10/2020",
           "03/21/2020",
-          "04/14/2020",
-          "05/08/2020",
+          "05/04/2020",
           "05/18/2020",
-          "06/03/2020"
+          "06/03/2020",
+          "06/30/2020"
         )
-      pi0 <- c(1.0, 0.9, 0.4, 0.2, 0.15, 0.2, 0.3,0.5, 1.0)
+      pi0 <- c(1.0, 0.8, 0.3, 0.2, 0.15, 0.3, 0.6, 0.85, 1)
 
       pi_t <- data.frame(
         x = as.Date(append(change_time,"02/15/2020",after=0),"%m/%d/%Y",origin="2020-02-15"),
         y = pi0)
-      pit_plot.after_1_may_and_18_reopen <- ggplot(pi_t, aes(x,y)) + geom_step() +labs(x = "Days", 
+      
+      pit_plot.after_1_may_and_18_reopen <- ggplot(pi_t, aes(x,y)) + 
+        scale_x_date(date_breaks = "months" ,date_labels = "%Y/%m") + 
+        scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+        geom_step() +labs(x = "Days", 
                                                                      y = expression(pi*(t)), 
                                                                      title = "Trasmission rate over time", 
-                                                                     subtitle = "reopen after 1st May", 
-                                                                     caption = "Enrico Papalini @popoloni") #Ploting the pi_t step function
+                                                                     subtitle = "reopen since 4th May", 
+                                                                     caption = "Enrico Papalini @popoloni") + 
+        theme_ipsum() #Ploting the pi_t step function
       
-      
-      res.after_1_may_and_18_reopen <-
-        tvt.eSIR(
-          Y,
-          R,
-          begin_str = format(StartDay, "%m/%d/%Y"),
-          death_in_R = death_in_R,
-          beta0 = beta0,
-          gamma0 = gamma0,
-          T_fin = 160,
-          pi0 = pi0,
-          change_time = change_time,
-          dic = T,
-          casename = sprintf("%s_after_1_may_and_18_reopen", country),
-          save_files = T,
-          save_mcmc = T,
-          save_plot_data = T,
-          add_death = T,
-          M = 5e3,
-          nburnin = 2e3
-        )
-      
-      
-      
-      
-      ### scenario with lockdown and an late  and immediate reopen after 2nd of June
-      
-      change_time <-
-        c("02/21/2020",
-          "03/08/2020",
-          "03/10/2020",
-          "03/21/2020",
-          "04/14/2020",
-          "06/03/2020")
-      pi0 <- c(1.0, 0.9, 0.4, 0.2, 0.15, 0.2, 1.0)
 
-      pi_t <- data.frame(
-        x = as.Date(append(change_time,"02/15/2020",after=0),"%m/%d/%Y",origin="2020-02-15"),
-        y = pi0)
-      pit_plot.after_2_june_reopen <- ggplot(pi_t, aes(x,y)) + geom_step() +labs(x = "Days", 
-                                                                                      y = expression(pi*(t)), 
-                                                                                      title = "Trasmission rate over time", 
-                                                                                      subtitle = "reopen after 2nd June", 
-                                                                                      caption = "Enrico Papalini @popoloni") #Ploting the pi_t step function
       
-      res.after_2_june_reopen <-
-        tvt.eSIR(
-          Y,
-          R,
-          begin_str = format(StartDay, "%m/%d/%Y"),
-          death_in_R = death_in_R,
-          beta0 = beta0,
-          gamma0 = gamma0,
-          T_fin = 160,
-          pi0 = pi0,
-          change_time = change_time,
-          dic = T,
-          casename = sprintf("%safter_2_june_reopen", country),
-          save_files = T,
-          save_mcmc = T,
-          save_plot_data = T,
-          add_death = T,
-          M = 5e3,
-          nburnin = 2e3
-        )
+      
+    
+      # res.after_1_may_and_18_reopen <-
+      #   tvt.eSIR(
+      #     Y,
+      #     R,
+      #     begin_str = format(StartDay, "%m/%d/%Y"),
+      #     death_in_R = death_in_R,
+      #     beta0 = beta0,
+      #     gamma0 = gamma0,
+      #     T_fin = 160,
+      #     pi0 = pi0,
+      #     change_time = change_time,
+      #     dic = T,
+      #     casename = sprintf("%s_after_1_may_and_18_reopen", country),
+      #     save_files = T,
+      #     save_mcmc = T,
+      #     save_plot_data = T,
+      #     add_death = T,
+      #     M = 5e3,
+      #     nburnin = 2e3
+      #   )
+      
+      
+      
+      
+      # ### scenario with lockdown and an late  and immediate reopen after 2nd of June
+      # 
+      # change_time <-
+      #   c("02/21/2020",
+      #     "03/08/2020",
+      #     "03/10/2020",
+      #     "03/21/2020",
+      #     "04/14/2020",
+      #     "06/03/2020",
+      #     "06/30/2020")
+      # pi0 <- c(1.0, 0.9, 0.4, 0.2, 0.15, 0.2, 0.5, 0.75)
+      # 
+      # pi_t <- data.frame(
+      #   x = as.Date(append(change_time,"02/15/2020",after=0),"%m/%d/%Y",origin="2020-02-15"),
+      #   y = pi0)
+      # pit_plot.after_2_june_reopen <- ggplot(pi_t, aes(x,y)) + geom_step() +labs(x = "Days", 
+      #                                                                                 y = expression(pi*(t)), 
+      #                                                                                 title = "Trasmission rate over time", 
+      #                                                                                 subtitle = "reopen after 2nd June", 
+      #                                                                                 caption = "Enrico Papalini @popoloni") #Ploting the pi_t step function
+      # 
+      # res.after_2_june_reopen <-
+      #   tvt.eSIR(
+      #     Y,
+      #     R,
+      #     begin_str = format(StartDay, "%m/%d/%Y"),
+      #     death_in_R = death_in_R,
+      #     beta0 = beta0,
+      #     gamma0 = gamma0,
+      #     T_fin = 160,
+      #     pi0 = pi0,
+      #     change_time = change_time,
+      #     dic = T,
+      #     casename = sprintf("%safter_2_june_reopen", country),
+      #     save_files = T,
+      #     save_mcmc = T,
+      #     save_plot_data = T,
+      #     add_death = T,
+      #     M = 5e3,
+      #     nburnin = 2e3
+      #   )
       
       
       # ### SIR with time-varying quarantine, which follows a Dirac Delta function rho(t)
@@ -1457,35 +1500,55 @@ for(useWorld in c(TRUE,FALSE)){
       # print(res.q$plot_removed)
       ###
       
-      cc_infection <- coord_cartesian(xlim =c(min(res.lockdown$plot_infection$data$x, na.rm = TRUE), max(res.lockdown$plot_infection$data$x, na.rm = TRUE)), ylim = c(min(res.lockdown$plot_infection$data$y, na.rm = TRUE), max(res.lockdown$plot_infection$data$y, na.rm = TRUE)))
-      cc_removed <- coord_cartesian(xlim =c(min(res.lockdown$plot_removed$data$x, na.rm = TRUE), max(res.lockdown$plot_removed$data$x, na.rm = TRUE)), ylim = c(min(res.lockdown$plot_removed$data$y, na.rm = TRUE), max(res.lockdown$plot_removed$data$y, na.rm = TRUE)))
-      cc_removed_zoom <- coord_cartesian(xlim =c(min(res.lockdown$plot_removed$data$x, na.rm = TRUE), max(res.lockdown$plot_removed$data$x, na.rm = TRUE)), ylim = c(min(res.lockdown$plot_removed$data$y, na.rm = TRUE), max(res.lockdown$plot_removed$data$y, na.rm = TRUE)/10))
+      #cc_infection    <- coord_cartesian(xlim =c(min(res.lockdown$plot_infection$data$x, na.rm = TRUE), max(res.lockdown$plot_infection$data$x, na.rm = TRUE)), ylim = c(min(res.lockdown$plot_infection$data$y, na.rm = TRUE), max(res.lockdown$plot_infection$data$y, na.rm = TRUE)))
+      #cc_removed      <- coord_cartesian(xlim =c(min(res.lockdown$plot_removed$data$x, na.rm = TRUE), max(res.lockdown$plot_removed$data$x, na.rm = TRUE)), ylim = c(min(res.lockdown$plot_removed$data$y, na.rm = TRUE), max(res.lockdown$plot_removed$data$y, na.rm = TRUE)))
+      #cc_removed_zoom <- coord_cartesian(xlim =c(min(res.lockdown$plot_removed$data$x, na.rm = TRUE), max(res.lockdown$plot_removed$data$x, na.rm = TRUE)), ylim = c(min(res.lockdown$plot_removed$data$y, na.rm = TRUE), max(res.lockdown$plot_removed$data$y, na.rm = TRUE)/10))
+      useCountry <- 'Italy'
       
+      #print(pit_plot.lockdown)
       #print(res.herd_immunity$plot_infection)
-      print(res.lockdown$plot_infection+cc_infection)
-     # print(res.after_easter_reopen$plot_infection)
-     # print(res.after_1_may_reopen$plot_infection)
-      print(res.after_1_may_and_18_reopen$plot_infection+cc_infection)
-      print(res.after_2_june_reopen$plot_infection+cc_infection)
+      #print(res.lockdown$plot_infection+cc_infection + scale_y_continuous(labels = percent,sec.axis = sec_axis(~ . * N))+labs(caption = sprintf("Tot. %s Population: %s",useCountry,N)))
+      #print(res.after_easter_reopen$plot_infection)
+      #print(res.after_1_may_reopen$plot_infection)
+      #print(pit_plot.after_1_may_and_18_reopen)
+      #print(res.after_1_may_and_18_reopen$plot_infection+ scale_y_continuous(labels = percent,sec.axis = sec_axis(~ . * N))+labs(caption = sprintf("Tot. %s Population: %s",useCountry,N)))
+      #print(res.after_1_may_and_18_reopen$plot_infection+cc_infection+ scale_y_continuous(labels = percent,sec.axis = sec_axis(~ . * N))+labs(caption = sprintf("Tot. %s Population: %s",useCountry,N)))
+      #print(res.after_2_june_reopen$plot_infection+cc_infection+ scale_y_continuous(labels = percent,sec.axis = sec_axis(~ . * N))+labs(caption = sprintf("Tot. %s Population: %s",useCountry,N)))
       
       
       #print(res.herd_immunity$plot_removed+cc_removed)
-      print(res.lockdown$plot_removed+cc_removed)
+      #print(res.lockdown$plot_removed+cc_removed+ scale_y_continuous(labels = percent,sec.axis = sec_axis(~ . * N))+labs(caption = sprintf("Tot. %s Population: %s",useCountry,N)))
       #print(res.after_easter_reopen$plot_removed+cc_removed)
       #print(res.after_1_may_reopen$plot_removed+cc_removed)
-      print(res.after_1_may_and_18_reopen$plot_removed+cc_removed)
-      print(res.after_2_june_reopen$plot_removed+cc_removed)
+      #print(res.after_1_may_and_18_reopen$plot_removed+ scale_y_continuous(labels = percent,sec.axis = sec_axis(~ . * N))+labs(caption = sprintf("Tot. %s Population: %s",useCountry,N)))
+      #print(res.after_1_may_and_18_reopen$plot_removed+cc_removed+ scale_y_continuous(labels = percent,sec.axis = sec_axis(~ . * N))+labs(caption = sprintf("Tot. %s Population: %s",useCountry,N)))
+      #print(res.after_2_june_reopen$plot_removed+cc_removed+ scale_y_continuous(labels = percent,sec.axis = sec_axis(~ . * N))+labs(caption = sprintf("Tot. %s Population: %s",useCountry,N)))
       
       #print(res.herd_immunity$plot_removed+cc_removed_zoom)
-      print(res.lockdown$plot_removed+cc_removed_zoom)
+      #print(res.lockdown$plot_removed+cc_removed_zoom+ scale_y_continuous(labels = percent,sec.axis = sec_axis(~ . * N))+labs(caption = sprintf("Tot. %s Population: %s",useCountry,N)))
       #print(res.after_easter_reopen$plot_removed+cc_removed_zoom)
       #print(res.after_1_may_reopen$plot_removed+cc_removed_zoom)
-      print(res.after_1_may_and_18_reopen$plot_removed+cc_removed_zoom)
-      print(res.after_2_june_reopen$plot_removed+cc_removed_zoom)
+      #print(res.after_1_may_and_18_reopen$plot_removed+cc_removed_zoom + scale_y_continuous(labels = percent,sec.axis = sec_axis(~ . * N))+labs(caption = sprintf("Tot. %s Population: %s",useCountry,N)))
+      #print(res.after_2_june_reopen$plot_removed+cc_removed_zoom)
+      
+      
+      
+      ### without pi(t), the standard state-space SIR model without intervention
+      res.no_lockdown <- tvt.eSIR(Y,R,begin_str=format(StartDay,"%m/%d/%Y"),death_in_R = death_in_R, beta0 = beta0, gamma0=gamma0,T_fin=250,
+                            casename=sprintf("%s_no_lockdown",useCountry),
+                           save_files = F, save_mcmc=F,save_plot_data = F,add_death =T,
+                            M=5e4,nburnin = 2e4)
+      
+      print(res.no_lockdown$plot_infection+ scale_y_continuous(labels = percent,sec.axis = sec_axis(~ . * N))+labs(caption = sprintf("Tot. %s Population: %s",useCountry,N)))
+      print(res.no_lockdown$plot_removed  + scale_y_continuous(labels = percent,sec.axis = sec_axis(~ . * N))+labs(caption = sprintf("Tot. %s Population: %s",useCountry,N)))
+      
+      
     }
     ### end italy
     #
   }
   dev.off() # lo chiudo
 }
+
+
 

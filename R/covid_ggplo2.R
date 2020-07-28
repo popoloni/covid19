@@ -9,6 +9,8 @@ library(ggrepel)
 library(paletteer)
 library(zoo)
 library(ggrepel)
+library(viridis)
+library(hrbrthemes)
 
 library(showtext)
 showtext_auto()
@@ -21,11 +23,11 @@ mytheme <- theme_myriad_semi() +
   theme(plot.title = element_text(size = rel(2), face = "bold"),
         plot.subtitle = element_text(size = rel(1.5)),
         plot.caption = element_text(size = rel(0.9)),
-        axis.text.y = element_text(size = rel(2)),
-        axis.title.x = element_text(size = rel(1.5)),
-        axis.title.y = element_text(size = rel(1.5)),
-        axis.text.x = element_text(size = rel(2)),
-        legend.text = element_text(size = rel(2))
+        axis.text.y = element_text(size = rel(1.5)),
+        axis.title.x = element_text(size = rel(1)),
+        axis.title.y = element_text(size = rel(1)),
+        axis.text.x = element_text(size = rel(1.5)),
+        legend.text = element_text(size = rel(1.5))
   )
 
 
@@ -175,6 +177,9 @@ covid <- coalesce_join(covid, cname_xwalk,
 #   select(geo_id, countries_and_territories, iso2, iso3, cname) %>%
 #   distinct()
 
+write.csv(covid,sprintf("covid19_ECDC_df_%s.csv", Sys.Date()), row.names = FALSE)
+
+
 cov_curve <- covid %>%
   select(date, cname, iso3, cases, deaths) %>%
   drop_na(iso3) %>%
@@ -185,6 +190,75 @@ cov_curve <- covid %>%
          rl_cases  = rollapply(cases,7,mean,align='right',fill=NA),
          rl_deaths = rollapply(deaths,7,mean,align='right',fill=NA)) 
 
+cov_curve_cont <- covid %>%
+  select(date, continent_exp, cases, deaths) %>%
+  mutate(cname = continent_exp) %>%
+  select(-c("continent_exp")) %>%
+  group_by(cname) %>%
+  arrange(date) %>%
+  mutate(cu_cases  = cumsum(cases), 
+         cu_deaths = cumsum(deaths),
+         rl_cases  = rollapply(cases,7,mean,align='right',fill=NA),
+         rl_deaths = rollapply(deaths,7,mean,align='right',fill=NA)) 
+
+###
+
+current_dataset_pivot <- cov_curve_cont %>%
+  pivot_longer(
+    cols = c(
+      "cases",
+      "deaths",
+      "cu_cases",
+      "cu_deaths",
+      "rl_cases",
+      "rl_deaths"),
+    names_to = "cases",
+    values_drop_na = TRUE
+  )  %>% drop_na()
+
+start_plot_date <- as.Date("2020-02-01")
+
+current_dataset_temp <- current_dataset_pivot %>% filter(date > start_plot_date & cname != 'Other')
+current_dataset_temp <- current_dataset_temp %>% filter(cases %in% c("cases", "deaths")) %>% group_by(date,cname,cases) %>% summarise(value=sum(value)) %>% select(date,cname,cases,value) %>% ungroup() %>% mutate(cases=factor(cases,levels=c("deaths", "cases")))
+
+cbc <- ggplot(current_dataset_temp %>% filter(cases %in% c("cases")), aes(fill=cname, y=value, x=date)) + 
+  geom_bar(position="stack", stat="identity") +
+  scale_fill_viridis(discrete = T) +
+  labs(x = "Days", 
+       y = "Number of Cases", 
+       title = "Cases by Continent", 
+       subtitle = paste("Data as of", format(max(current_dataset_temp$date), "%d-%m-%Y")), 
+       caption = "Enrico Papalini @popoloni / Data: ECDC") + 
+  mytheme
+
+cbcp <- ggplot(current_dataset_temp %>% filter(cases %in% c("cases")), aes(fill=cname, y=value, x=date)) + 
+  geom_bar(position="fill", stat="identity") +
+  scale_fill_viridis(discrete = T) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 10)) + 
+  labs(x = "Days", 
+       y = "% of Cases", 
+       title = "Cases by Continent", 
+       subtitle = paste("Data as of", format(max(current_dataset_temp$date), "%d-%m-%Y")), 
+       caption = "Enrico Papalini @popoloni / Data: ECDC") + 
+  mytheme
+
+
+cdbc <- ggplot(current_dataset_temp  , aes(x = date, y = value, fill = cases, label = value)) +
+  geom_bar(stat = "identity") +
+  #geom_text(size = 3, position = position_stack(vjust = 0.5),check_overlap=TRUE,angle=90,col="grey") +
+  scale_fill_viridis(discrete = T) +
+  labs(x = "Days", 
+       y = "Number of Cases", 
+       title = "Cases and Deaths from COVID-19, by Continent", 
+       subtitle = paste("Data as of", format(max(current_dataset_temp$date), "%d-%m-%Y")), 
+       caption = "Enrico Papalini @popoloni / Data: ECDC") + 
+  mytheme +
+  facet_wrap(~cname)   
+
+
+
+
+###
 
 
 cov_curve_deaths<- cov_curve %>%
@@ -198,8 +272,7 @@ cov_curve_cases <- cov_curve %>%
          end_label = ifelse(date == max(date), cname, NA))
 
 
-focus_cn <- c("CAN", "GBR", "USA", "DEU", "ITA",
-              "FRA", "ESP", "TUR", "CHE")
+focus_cn <- c("USA", "ESP", "ITA", "DEU", "FRA", "GBR", "TUR", "RUS", "BRA")
 
 cov_curve_deaths_filtered <- cov_curve_deaths %>% filter(iso3 %in% focus_cn)
 
@@ -541,12 +614,17 @@ cov_death_sm <- cov_death_curve  %>%
 
 
 pdf(file=sprintf("COVID-19 graphs ggp2 %s.pdf",Sys.Date()),paper="a4r",width=14, height=14) # apro il device
+
+print(cbc)
+print(cbcp)
+print(cdbc)
 print(plot_cases)
 print(cov_case_sm)
 print(plot_cases_rolling)
 print(plot_deaths)
 print(plot_deaths_rolling)
 print(cov_death_sm)
+
 dev.off()
 
 
